@@ -3,6 +3,7 @@ package main
 import (
 	"flag"
 	"log"
+	"net/http"
 	"os"
 	"strings"
 
@@ -43,6 +44,13 @@ func reposToSearch() []repo.Repository {
 		repos = append(repos, v)
 	}
 	return repos
+}
+
+func downPage(r repo.Repository) {
+	switch r.HttpMethod() {
+	case http.MethodGet:
+		log.Println("get")
+	}
 }
 
 func main() {

@@ -1,6 +1,8 @@
 package libgen
 
 import (
+	"net/http"
+
 	"github.com/josecleiton/godownbook/repo"
 )
 
@@ -10,7 +12,9 @@ type LibGen struct {
 	paginationField string
 	sortEnabled     bool
 	sortField       string
-	sortValues      map[int]string
+	sortValues      []string
+	sortModeField   string
+	sortModeValues  map[repo.SortMode]string
 	extraFields     map[string]string
 }
 
@@ -20,8 +24,10 @@ func Init() LibGen {
 		searchUrl:       "http://gen.lib.rus.ec/search.php",
 		paginationField: "page",
 		sortEnabled:     true,
-		sortField:       "sortmode",
-		sortValues: map[int]string{
+		sortField:       "sort",
+		sortValues:      []string{"id", "author", "title", "publisher", "year", "pages", "language", "filesize", "extension"},
+		sortModeField:   "sortmode",
+		sortModeValues: map[repo.SortMode]string{
 			repo.ASC:  "ASC",
 			repo.DESC: "DESC",
 		},
@@ -35,6 +41,10 @@ func Init() LibGen {
 }
 
 func (lib LibGen) downPage() {
+}
+
+func (LibGen) HttpMethod() string {
+	return http.MethodGet
 }
 
 func (l LibGen) SearchUrl() string {
@@ -57,8 +67,16 @@ func (l LibGen) SortField() string {
 	return l.sortField
 }
 
-func (l LibGen) SortValues() map[int]string {
+func (l LibGen) SortValues() []string {
 	return l.sortValues
+}
+
+func (l LibGen) SortModeField() string {
+	return l.sortModeField
+}
+
+func (l LibGen) SortModeValues() map[repo.SortMode]string {
+	return l.sortModeValues
 }
 
 func (l LibGen) ExtraFields() map[string]string {
