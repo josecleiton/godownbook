@@ -2,18 +2,22 @@ package main
 
 import (
 	"flag"
+	"log"
+	"os"
+	"strings"
+
 	ui "github.com/gizak/termui/v3"
 	"github.com/gizak/termui/v3/widgets"
-	"log"
-	"strings"
+	"github.com/josecleiton/godownbook/repo"
+	"github.com/josecleiton/godownbook/repo/libgen"
 )
 
 var searchPattern string
 var verboseFlag bool
 var repository string
 
-var supportedRepositories = map[string]string{
-	"libgen": "Library Genesis",
+var supportedRepositories = map[string]repo.Repository{
+	"libgen": libgen.Init(),
 }
 
 func init() {
@@ -23,14 +27,28 @@ func init() {
 	flag.Parse()
 }
 
-func main() {
-	if repository != "" && supportedRepositories[repository] == "" {
-		keys := make([]string, 0, len(supportedRepositories))
-		for k := range supportedRepositories {
-			keys = append(keys, k)
+func reposToSearch() []repo.Repository {
+	if repository != "" {
+		if supportedRepositories[repository] == nil {
+			keys := make([]string, 0, len(supportedRepositories))
+			for k := range supportedRepositories {
+				keys = append(keys, k)
+			}
+			log.Fatalf("Use a supported repository: [%v]\n", strings.Join(keys, ", "))
 		}
-		log.Fatalf("Use a supported repository: [%v]\n", strings.Join(keys, ", "))
+		return []repo.Repository{supportedRepositories[repository]}
 	}
+	repos := make([]repo.Repository, 0, len(supportedRepositories))
+	for _, v := range supportedRepositories {
+		repos = append(repos, v)
+	}
+	return repos
+}
+
+func main() {
+	repos := reposToSearch()
+	log.Println(repos)
+	os.Exit(0)
 	if err := ui.Init(); err != nil {
 		log.Fatalf("failed to initialize termui: %v", err)
 	}

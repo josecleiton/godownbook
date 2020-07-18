@@ -6,7 +6,11 @@ const (
 )
 
 type Repository interface {
-	MaxPageNumber(page string, n int) int
-	Name() string
-	Alias() string
+	SearchUrl() string
+	QueryField() string
+	PaginationField() string
+	SortEnabled() bool
+	SortField() string
+	SortValues() map[int]string
+	ExtraFields() map[string]string
 }

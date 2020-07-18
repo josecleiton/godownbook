@@ -5,44 +5,63 @@ import (
 )
 
 type LibGen struct {
+	queryField      string
+	searchUrl       string
+	paginationField string
+	sortEnabled     bool
+	sortField       string
+	sortValues      map[int]string
+	extraFields     map[string]string
+}
+
+func Init() LibGen {
+	return LibGen{
+		queryField:      "req",
+		searchUrl:       "http://gen.lib.rus.ec/search.php",
+		paginationField: "page",
+		sortEnabled:     true,
+		sortField:       "sortmode",
+		sortValues: map[int]string{
+			repo.ASC:  "ASC",
+			repo.DESC: "DESC",
+		},
+		extraFields: map[string]string{
+			"phrase": "1",
+			"view":   "simple",
+			"column": "def",
+			"sort":   "def",
+		},
+	}
 }
 
 func (lib LibGen) downPage() {
 }
 
-func (LibGen) SearchUrl() string {
-	return "http://gen.lib.rus.ec/search.php"
+func (l LibGen) SearchUrl() string {
+	return l.searchUrl
 }
 
-func (LibGen) QueryField() string {
-	return "req"
+func (l LibGen) QueryField() string {
+	return l.queryField
 }
 
-func (LibGen) PaginationField() string {
-	return "page"
+func (l LibGen) PaginationField() string {
+	return l.paginationField
 }
 
-func (LibGen) SortEnabled() bool {
-	return true
+func (l LibGen) SortEnabled() bool {
+	return l.sortEnabled
 }
 
-func (LibGen) SortField() string {
-	return "sortmode"
+func (l LibGen) SortField() string {
+	return l.sortField
 }
 
-func (LibGen) SortValues() map[int]string {
-	return map[int]string{
-		repo.ASC:  "ASC",
-		repo.DESC: "DESC",
-	}
+func (l LibGen) SortValues() map[int]string {
+	return l.sortValues
 }
 
-func (LibGen) ExtraFields() map[string]string {
-	return map[string]string{
-		"phrase": "1",
-		"view":   "simple",
-		"column": "def",
-		"sort":   "def",
-	}
+func (l LibGen) ExtraFields() map[string]string {
+	return l.extraFields
 }
 
