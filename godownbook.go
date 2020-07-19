@@ -18,7 +18,7 @@ var verboseFlag bool
 var repository string
 
 var supportedRepositories = map[string]repo.Repository{
-	"libgen": libgen.NewLibGen(),
+	"libgen": libgen.New(),
 }
 
 func init() {

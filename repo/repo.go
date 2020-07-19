@@ -2,7 +2,8 @@ package repo
 
 import (
 	"bytes"
-	"io/ioutil"
+	"errors"
+	"io"
 	"log"
 	"net/http"
 	"net/url"
@@ -16,6 +17,15 @@ const (
 	ASC SortMode = iota
 	DESC
 )
+
+// ContentError generic error on parsing content
+var ContentError = errors.New("content parsing error")
+
+// BookRow represents a book row
+type BookRow struct {
+	InfoPage *url.URL
+	Columns  []string
+}
 
 // Repository represents a book repository
 type Repository interface {
@@ -31,8 +41,8 @@ type Repository interface {
 	SortEnabled() bool
 	// SortField returns the sort field param of repository. Ex: ?sort=author
 	SortField() string
-	// SortField returns the possible columns to sort. Ex: [author, year]
-	SortValues() []string
+	// Colums columns from repo
+	Columns() []string
 	//SortModeField returns the sort mode field of repository. Ex: ?sortmode=ASC
 	SortModeField() string
 	// SortModeValues returns a map to ascending and descending sort modes
@@ -41,10 +51,10 @@ type Repository interface {
 	ExtraFields() map[string]string
 	// ContentType content type of repository. Highly recommended in POST calls
 	ContentType() string
-	// GetRows return rows from content, n is where to start the format
-	GetRows(content string, n int) [][]string
-	// MaxPageNumber n is where to start the format
-	MaxPageNumber(content string, n int) int
+	// GetRows return rows from content
+	GetRows(content io.ReadCloser) ([]*BookRow, error)
+	// MaxPageNumber return max page number from content
+	MaxPageNumber(content io.ReadCloser) (int, error)
 }
 
 // BaseUrl return url base search url from repository
@@ -82,7 +92,7 @@ func QueryExtraFields(r Repository, params *url.Values) {
 }
 
 // FetchContent use repository httpMethod to pull the content
-func FetchContent(r Repository, url string) string {
+func FetchContent(r Repository, url string) io.ReadCloser {
 	var resp *http.Response
 	var err error
 	switch r.HttpMethod() {
@@ -91,15 +101,10 @@ func FetchContent(r Repository, url string) string {
 	case http.MethodPost:
 		resp, err = http.Post(url, r.ContentType(), bytes.NewBuffer([]byte{}))
 	}
-	defer resp.Body.Close()
 	if err != nil {
 		handleErr(err)
 	}
-	body, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		handleErr(err)
-	}
-	return string(body)
+	return resp.Body
 }
 
 func handleErr(err error) {
