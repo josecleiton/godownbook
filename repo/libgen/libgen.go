@@ -18,7 +18,7 @@ type LibGen struct {
 	extraFields     map[string]string
 }
 
-func Init() LibGen {
+func NewLibGen() LibGen {
 	return LibGen{
 		queryField:      "req",
 		searchUrl:       "http://gen.lib.rus.ec/search.php",
@@ -81,5 +81,17 @@ func (l LibGen) SortModeValues() map[repo.SortMode]string {
 
 func (l LibGen) ExtraFields() map[string]string {
 	return l.extraFields
+}
+
+func (LibGen) ContentType() string {
+	return ""
+}
+
+func (LibGen) GetRows(content string, n int) [][]string {
+	return [][]string{}
+}
+
+func (LibGen) MaxPageNumber(content string, n int) int {
+	return 42
 }
 

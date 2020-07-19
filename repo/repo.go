@@ -1,11 +1,15 @@
 package repo
 
 import (
+	"bytes"
+	"io/ioutil"
 	"log"
+	"net/http"
 	"net/url"
 	"strconv"
 )
 
+// SortMode search sort mode
 type SortMode int
 
 const (
@@ -13,17 +17,34 @@ const (
 	DESC
 )
 
+// Repository represents a book repository
 type Repository interface {
+	// HttpMethod returns the http method to fetch content
 	HttpMethod() string
+	// SearchUrl returns the base url of repository
 	SearchUrl() string
+	// QueryField returns the query field of repository. Ex: ?search=value
 	QueryField() string
+	//  PaginationField returns the page field of repository. Ex: ?page=2
 	PaginationField() string
+	// SortEnabled returns if repository allow sorting
 	SortEnabled() bool
+	// SortField returns the sort field param of repository. Ex: ?sort=author
 	SortField() string
+	// SortField returns the possible columns to sort. Ex: [author, year]
 	SortValues() []string
+	//SortModeField returns the sort mode field of repository. Ex: ?sortmode=ASC
 	SortModeField() string
+	// SortModeValues returns a map to ascending and descending sort modes
 	SortModeValues() map[SortMode]string
+	// ExtraFields any extra field to append into http call
 	ExtraFields() map[string]string
+	// ContentType content type of repository. Highly recommended in POST calls
+	ContentType() string
+	// GetRows return rows from content, n is where to start the format
+	GetRows(content string, n int) [][]string
+	// MaxPageNumber n is where to start the format
+	MaxPageNumber(content string, n int) int
 }
 
 // BaseUrl return url base search url from repository
@@ -58,5 +79,30 @@ func QueryExtraFields(r Repository, params *url.Values) {
 	for k, v := range r.ExtraFields() {
 		params.Add(k, v)
 	}
+}
+
+// FetchContent use repository httpMethod to pull the content
+func FetchContent(r Repository, url string) string {
+	var resp *http.Response
+	var err error
+	switch r.HttpMethod() {
+	case http.MethodGet:
+		resp, err = http.Get(url)
+	case http.MethodPost:
+		resp, err = http.Post(url, r.ContentType(), bytes.NewBuffer([]byte{}))
+	}
+	defer resp.Body.Close()
+	if err != nil {
+		handleErr(err)
+	}
+	body, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		handleErr(err)
+	}
+	return string(body)
+}
+
+func handleErr(err error) {
+	log.Fatalln(err)
 }
 
