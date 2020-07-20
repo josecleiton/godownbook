@@ -240,7 +240,7 @@ func bookRowCrowler(nodes []*html.Node, rowLen int) ([]*repo.BookRow, error) {
 	for i := 0; i < BOOKS_PER_PAGE; i++ {
 		br, err := newBookRow(nodes[i], rowLen)
 		if err != nil {
-			handleErr(err)
+			return []*repo.BookRow{}, err
 		}
 		list = append(list, br)
 	}
@@ -250,27 +250,27 @@ func bookRowCrowler(nodes []*html.Node, rowLen int) ([]*repo.BookRow, error) {
 func (l LibGen) GetRows(content string) ([]*repo.BookRow, error) {
 	doc, err := html.Parse(strings.NewReader(content))
 	if err != nil {
-		handleErr(err)
+		return []*repo.BookRow{}, err
 	}
 	body, err := bodyCrowler(doc)
 	if err != nil {
-		handleErr(err)
+		return []*repo.BookRow{}, err
 	}
 	table, err := bookTableCrowler(body)
 	if err != nil {
-		handleErr(err)
+		return []*repo.BookRow{}, err
 	}
 	tbody, err := bookTbodyCrowler(table)
 	if err != nil {
-		handleErr(err)
+		return []*repo.BookRow{}, err
 	}
 	trList, err := bookTrCrowler(tbody)
 	if err != nil {
-		handleErr(err)
+		return []*repo.BookRow{}, err
 	}
 	brs, err := bookRowCrowler(trList, len(l.columns))
 	if err != nil {
-		handleErr(err)
+		return []*repo.BookRow{}, err
 	}
 	return brs, nil
 }
@@ -278,11 +278,11 @@ func (l LibGen) GetRows(content string) ([]*repo.BookRow, error) {
 func (LibGen) MaxPageNumber(content string) (int, error) {
 	doc, err := html.Parse(strings.NewReader(content))
 	if err != nil {
-		handleErr(err)
+		return -1, err
 	}
 	body, err := bodyCrowler(doc)
 	if err != nil {
-		handleErr(err)
+		return -1, err
 	}
 	for child := body.FirstChild; child != nil; child = child.NextSibling {
 		if child.Type == html.ElementNode && child.Data == "script" {
@@ -295,9 +295,4 @@ func (LibGen) MaxPageNumber(content string) (int, error) {
 		}
 	}
 	return -1, errors.New("max page number not found")
-}
-
-func handleErr(err error) {
-	log.Fatalln(err)
-
 }
