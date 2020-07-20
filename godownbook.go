@@ -4,6 +4,7 @@ import (
 	"flag"
 	"log"
 	"net/http"
+	"net/url"
 	"os"
 	"strings"
 
@@ -46,6 +47,18 @@ func reposToSearch() []repo.Repository {
 	return repos
 }
 
+func firstRepoFetch(r repo.Repository) string {
+	u := r.BaseURL()
+	log.Println("baseUrl", u)
+	params := &url.Values{}
+	repo.Query(r, params, searchPattern)
+	repo.QueryExtraFields(r, params)
+	log.Println("params", params)
+	u.RawQuery = params.Encode()
+	log.Println("url", u)
+	return repo.FetchContent(r, u.String())
+}
+
 func downPage(r repo.Repository) {
 	switch r.HttpMethod() {
 	case http.MethodGet:
@@ -56,6 +69,13 @@ func downPage(r repo.Repository) {
 func main() {
 	repos := reposToSearch()
 	log.Println(repos)
+	rc := firstRepoFetch(repos[0])
+	br, _ := repos[0].GetRows(rc)
+	for _, row := range br {
+		log.Println(*row)
+	}
+	m, _ := repos[0].MaxPageNumber(rc)
+	log.Println("page", m)
 	os.Exit(0)
 	if err := ui.Init(); err != nil {
 		log.Fatalf("failed to initialize termui: %v", err)

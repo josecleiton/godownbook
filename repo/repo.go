@@ -3,7 +3,7 @@ package repo
 import (
 	"bytes"
 	"errors"
-	"io"
+	"io/ioutil"
 	"log"
 	"net/http"
 	"net/url"
@@ -32,7 +32,7 @@ type Repository interface {
 	// HttpMethod returns the http method to fetch content
 	HttpMethod() string
 	// SearchUrl returns the base url of repository
-	SearchUrl() string
+	BaseURL() *url.URL
 	// QueryField returns the query field of repository. Ex: ?search=value
 	QueryField() string
 	//  PaginationField returns the page field of repository. Ex: ?page=2
@@ -52,18 +52,9 @@ type Repository interface {
 	// ContentType content type of repository. Highly recommended in POST calls
 	ContentType() string
 	// GetRows return rows from content
-	GetRows(content io.ReadCloser) ([]*BookRow, error)
+	GetRows(content string) ([]*BookRow, error)
 	// MaxPageNumber return max page number from content
-	MaxPageNumber(content io.ReadCloser) (int, error)
-}
-
-// BaseUrl return url base search url from repository
-func BaseUrl(r Repository) *url.URL {
-	url, err := url.Parse(r.SearchUrl())
-	if err != nil {
-		log.Fatalln(err)
-	}
-	return url
+	MaxPageNumber(content string) (int, error)
 }
 
 // QueryPage appends pagination field to url params
@@ -92,9 +83,10 @@ func QueryExtraFields(r Repository, params *url.Values) {
 }
 
 // FetchContent use repository httpMethod to pull the content
-func FetchContent(r Repository, url string) io.ReadCloser {
+func FetchContent(r Repository, url string) string {
 	var resp *http.Response
 	var err error
+
 	switch r.HttpMethod() {
 	case http.MethodGet:
 		resp, err = http.Get(url)
@@ -104,7 +96,11 @@ func FetchContent(r Repository, url string) io.ReadCloser {
 	if err != nil {
 		handleErr(err)
 	}
-	return resp.Body
+	body, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		handleErr(err)
+	}
+	return string(body)
 }
 
 func handleErr(err error) {

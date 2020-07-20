@@ -3,7 +3,6 @@ package libgen
 import (
 	"errors"
 	"fmt"
-	"io"
 	"log"
 	"net/http"
 	"net/url"
@@ -32,7 +31,7 @@ const (
 
 type LibGen struct {
 	queryField      string
-	searchUrl       string
+	baseURL         *url.URL
 	paginationField string
 	sortEnabled     bool
 	sortField       string
@@ -43,9 +42,10 @@ type LibGen struct {
 }
 
 func New() LibGen {
+	u, _ := url.Parse("http://gen.lib.rus.ec/search.php")
 	return LibGen{
 		queryField:      "req",
-		searchUrl:       "http://gen.lib.rus.ec/search.php",
+		baseURL:         u,
 		paginationField: "page",
 		sortEnabled:     true,
 		sortField:       "sort",
@@ -68,8 +68,8 @@ func (LibGen) HttpMethod() string {
 	return http.MethodGet
 }
 
-func (l LibGen) SearchUrl() string {
-	return l.searchUrl
+func (l LibGen) BaseURL() *url.URL {
+	return l.baseURL
 }
 
 func (l LibGen) QueryField() string {
@@ -214,8 +214,8 @@ func bookRowCrowler(nodes []*html.Node, rowLen int) ([]*repo.BookRow, error) {
 	return list, nil
 }
 
-func (l LibGen) GetRows(content io.ReadCloser) ([]*repo.BookRow, error) {
-	doc, err := html.Parse(content)
+func (l LibGen) GetRows(content string) ([]*repo.BookRow, error) {
+	doc, err := html.Parse(strings.NewReader(content))
 	if err != nil {
 		handleErr(err)
 	}
@@ -242,20 +242,23 @@ func (l LibGen) GetRows(content io.ReadCloser) ([]*repo.BookRow, error) {
 	return brs, nil
 }
 
-func (LibGen) MaxPageNumber(content io.ReadCloser) (int, error) {
-	doc, err := html.Parse(content)
+func (LibGen) MaxPageNumber(content string) (int, error) {
+	doc, err := html.Parse(strings.NewReader(content))
 	if err != nil {
 		handleErr(err)
 	}
-	for child := doc.FirstChild; child != nil; child = child.NextSibling {
-		if child.Type != html.ElementNode || child.Data != "script" {
-			continue
-		}
-		inEl := child.FirstChild
-		if strings.Contains(inEl.Data, "Paginator") {
-			re := regexp.MustCompile("\\d+")
-			raw := re.Find([]byte(inEl.Data))
-			return strconv.Atoi(string(raw))
+	body, err := bodyCrowler(doc)
+	if err != nil {
+		handleErr(err)
+	}
+	for child := body.FirstChild; child != nil; child = child.NextSibling {
+		if child.Type == html.ElementNode && child.Data == "script" {
+			inEl := child.FirstChild
+			if strings.Contains(inEl.Data, "Paginator") {
+				re := regexp.MustCompile("\\d+")
+				raw := re.Find([]byte(inEl.Data))
+				return strconv.Atoi(string(raw))
+			}
 		}
 	}
 	return -1, errors.New("max page number not found")
