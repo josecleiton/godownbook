@@ -19,7 +19,8 @@ const (
 )
 
 const (
-	author = iota
+	id = iota
+	author
 	title
 	publisher
 	year
@@ -145,7 +146,8 @@ func bookTbodyCrowler(node *html.Node) (*html.Node, error) {
 
 func bookTrCrowler(node *html.Node) ([]*html.Node, error) {
 	list := make([]*html.Node, 0, BOOKS_PER_PAGE)
-	for child := node.FirstChild; child != nil; child = child.NextSibling {
+	// ignore the header
+	for child := node.FirstChild.NextSibling; child != nil; child = child.NextSibling {
 		if child.Type == html.ElementNode && child.Data == "tr" {
 			list = append(list, child)
 		}
@@ -156,27 +158,53 @@ func bookTrCrowler(node *html.Node) ([]*html.Node, error) {
 	return list, nil
 }
 
+func bookTitleTextCrowler(node *html.Node) (string, error) {
+	if node.Type == html.TextNode {
+		return node.Data, nil
+	}
+	for child := node.FirstChild; child != nil; child = child.NextSibling {
+		if child.Type != html.TextNode {
+			continue
+		}
+		return child.Data, nil
+	}
+	return "", errors.New("book title text not found")
+}
+
 func bookTitleCrowler(node *html.Node) (text, url string, err error) {
 	for child := node.FirstChild; child != nil; child = child.NextSibling {
-		if child.Type != html.ElementNode || child.Data == "a" {
+		if !(child.Type == html.ElementNode && child.Data == "a") {
 			continue
 		}
 		for _, attr := range child.Attr {
-			if attr.Key == "href" && strings.HasPrefix(attr.Val, "book") {
-				return child.Data, attr.Val, nil
+			if !(attr.Key == "href" && strings.HasPrefix(attr.Val, "book")) {
+				continue
 			}
+			text, err := bookTitleTextCrowler(child.FirstChild)
+			return text, attr.Val, err
 		}
 	}
 	return "", "", errors.New("book title not found")
 }
 
+func bookTdCrowler(td *html.Node) (string, error) {
+	for child := td.FirstChild; child != nil; child = child.NextSibling {
+		if child.Type == html.TextNode {
+			return child.Data, nil
+		}
+		log.Println(child.Type == html.ElementNode, child.Data)
+	}
+	return "", errors.New("text node not found")
+}
+
 func newBookRow(tr *html.Node, rowLen int) (*repo.BookRow, error) {
 	br := &repo.BookRow{Columns: make([]string, 0, rowLen)}
-	i := -1
-	for child := tr.FirstChild; child != nil; child = child.NextSibling {
+	i := 0
+	for child := tr.FirstChild; child != nil && i < extension; child = child.NextSibling {
 		if child.Type == html.ElementNode && child.Data == "td" {
+			log.Println("idx", i)
 			// skip ID
-			if i == -1 {
+			if i == id {
 				i++
 				continue
 			}
@@ -193,7 +221,12 @@ func newBookRow(tr *html.Node, rowLen int) (*repo.BookRow, error) {
 				}
 				text = t
 			default:
-				text = child.Data
+				log.Println(child.Data)
+				t, err := bookTdCrowler(child)
+				if err != nil {
+					log.Println("text not found at column", i)
+				}
+				text = t
 			}
 			br.Columns = append(br.Columns, text)
 			i++
