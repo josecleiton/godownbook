@@ -40,13 +40,14 @@ type LibGen struct {
 	sortModeValues  map[repo.SortMode]string
 	columns         []string
 	extraFields     map[string]string
+	httpMethods     map[repo.FetchStep]string
 }
 
-func New() LibGen {
-	u, _ := url.Parse("http://gen.lib.rus.ec/search.php")
+func Make() LibGen {
+	base, _ := url.Parse("http://gen.lib.rus.ec/search.php")
 	return LibGen{
 		queryField:      "req",
-		baseURL:         u,
+		baseURL:         base,
 		paginationField: "page",
 		sortEnabled:     true,
 		sortField:       "sort",
@@ -62,11 +63,15 @@ func New() LibGen {
 			"column": "def",
 			"sort":   "def",
 		},
+		httpMethods: map[repo.FetchStep]string{
+			repo.RowStep:      http.MethodGet,
+			repo.InfoPageStep: http.MethodGet,
+		},
 	}
 }
 
-func (LibGen) HttpMethod() string {
-	return http.MethodGet
+func (l LibGen) HttpMethod(step repo.FetchStep) string {
+	return l.httpMethods[step]
 }
 
 func (l LibGen) BaseURL() *url.URL {
@@ -192,7 +197,6 @@ func bookTdCrowler(td *html.Node) (string, error) {
 		if child.Type == html.TextNode {
 			return child.Data, nil
 		}
-		log.Println(child.Type == html.ElementNode, child.Data)
 	}
 	return "", errors.New("text node not found")
 }
@@ -202,7 +206,6 @@ func newBookRow(tr *html.Node, rowLen int) (*repo.BookRow, error) {
 	i := 0
 	for child := tr.FirstChild; child != nil && i < extension; child = child.NextSibling {
 		if child.Type == html.ElementNode && child.Data == "td" {
-			log.Println("idx", i)
 			// skip ID
 			if i == id {
 				i++
@@ -221,10 +224,9 @@ func newBookRow(tr *html.Node, rowLen int) (*repo.BookRow, error) {
 				}
 				text = t
 			default:
-				log.Println(child.Data)
 				t, err := bookTdCrowler(child)
 				if err != nil {
-					log.Println("text not found at column", i)
+					log.Println("libgen: text not found at column", i)
 				}
 				text = t
 			}

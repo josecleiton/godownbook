@@ -1,9 +1,9 @@
 package main
 
 import (
+	"errors"
 	"flag"
 	"log"
-	"net/http"
 	"net/url"
 	"os"
 	"strings"
@@ -12,6 +12,7 @@ import (
 	"github.com/gizak/termui/v3/widgets"
 	"github.com/josecleiton/godownbook/repo"
 	"github.com/josecleiton/godownbook/repo/libgen"
+	"github.com/josecleiton/godownbook/util"
 )
 
 var searchPattern string
@@ -19,7 +20,7 @@ var verboseFlag bool
 var repository string
 
 var supportedRepositories = map[string]repo.Repository{
-	"libgen": libgen.New(),
+	"libgen": libgen.Make(),
 }
 
 func init() {
@@ -47,7 +48,7 @@ func reposToSearch() []repo.Repository {
 	return repos
 }
 
-func firstRepoFetch(r repo.Repository) string {
+func fetchInitialData(r repo.Repository) (content string, err error) {
 	u := r.BaseURL()
 	log.Println("baseUrl", u)
 	params := &url.Values{}
@@ -56,26 +57,42 @@ func firstRepoFetch(r repo.Repository) string {
 	log.Println("params", params)
 	u.RawQuery = params.Encode()
 	log.Println("url", u)
-	return repo.FetchContent(r, u.String())
+	content, code, err := repo.FetchContent(r, u.String(), repo.RowStep)
+	if code != 200 {
+		err = errors.New("fetch initial data status code != 200")
+	}
+	return
 }
 
-func downPage(r repo.Repository) {
-	switch r.HttpMethod() {
-	case http.MethodGet:
-		log.Println("get")
+func fetchBookInfo(r repo.Repository, row *repo.BookRow) (content string, err error) {
+	u := r.BaseURL()
+	log.Println("baseUrl", u)
+	u.Path = row.InfoPage.Path
+	u.RawQuery = row.InfoPage.RawQuery
+	log.Println("fullUrl", u)
+	content, code, err := repo.FetchContent(r, u.String(), repo.InfoPageStep)
+	if code != 200 {
+		err = errors.New("fetch book info status code != 200")
 	}
+	return
 }
 
 func main() {
+
 	repos := reposToSearch()
 	log.Println(repos)
-	rc := firstRepoFetch(repos[0])
-	br, _ := repos[0].GetRows(rc)
+	c, _ := fetchInitialData(repos[0])
+	util.PrintMemUsage()
+	br, _ := repos[0].GetRows(c)
 	for _, row := range br {
 		log.Println(*row)
 	}
-	m, _ := repos[0].MaxPageNumber(rc)
+	m, _ := repos[0].MaxPageNumber(c)
+	util.PrintMemUsage()
 	log.Println("page", m)
+	page, _ := fetchBookInfo(repos[0], br[0])
+	util.PrintMemUsage()
+	log.Println(page)
 	os.Exit(0)
 	if err := ui.Init(); err != nil {
 		log.Fatalf("failed to initialize termui: %v", err)

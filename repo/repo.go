@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"errors"
 	"io/ioutil"
-	"log"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -12,10 +11,17 @@ import (
 
 // SortMode search sort mode
 type SortMode int
+type FetchStep int
 
 const (
 	ASC SortMode = iota
 	DESC
+)
+
+const (
+	RowStep FetchStep = iota
+	InfoPageStep
+	DownloadStep
 )
 
 // ContentError generic error on parsing content
@@ -30,7 +36,7 @@ type BookRow struct {
 // Repository represents a book repository
 type Repository interface {
 	// HttpMethod returns the http method to fetch content
-	HttpMethod() string
+	HttpMethod(step FetchStep) string
 	// SearchUrl returns the base url of repository
 	BaseURL() *url.URL
 	// QueryField returns the query field of repository. Ex: ?search=value
@@ -83,27 +89,21 @@ func QueryExtraFields(r Repository, params *url.Values) {
 }
 
 // FetchContent use repository httpMethod to pull the content
-func FetchContent(r Repository, url string) string {
+func FetchContent(r Repository, url string, step FetchStep) (content string, code int, err error) {
 	var resp *http.Response
-	var err error
 
-	switch r.HttpMethod() {
-	case http.MethodGet:
-		resp, err = http.Get(url)
+	switch r.HttpMethod(step) {
 	case http.MethodPost:
 		resp, err = http.Post(url, r.ContentType(), bytes.NewBuffer([]byte{}))
+	default:
+		resp, err = http.Get(url)
 	}
+	defer resp.Body.Close()
+	code = resp.StatusCode
 	if err != nil {
-		handleErr(err)
+		return
 	}
 	body, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		handleErr(err)
-	}
-	return string(body)
-}
-
-func handleErr(err error) {
-	log.Fatalln(err)
+	return string(body), code, err
 }
 
