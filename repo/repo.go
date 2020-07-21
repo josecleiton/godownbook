@@ -7,6 +7,8 @@ import (
 	"net/http"
 	"net/url"
 	"strconv"
+
+	"github.com/josecleiton/godownbook/book"
 )
 
 // SortMode search sort mode
@@ -38,7 +40,7 @@ type Repository interface {
 	// HttpMethod returns the http method to fetch content
 	HttpMethod(step FetchStep) string
 	// SearchUrl returns the base url of repository
-	BaseURL() *url.URL
+	BaseURL() url.URL
 	// QueryField returns the query field of repository. Ex: ?search=value
 	QueryField() string
 	//  PaginationField returns the page field of repository. Ex: ?page=2
@@ -59,6 +61,9 @@ type Repository interface {
 	ContentType() string
 	// GetRows return rows from content
 	GetRows(content string) ([]*BookRow, error)
+
+	BookInfo(*BookRow) (*book.Book, error)
+
 	// MaxPageNumber return max page number from content
 	MaxPageNumber(content string) (int, error)
 }
@@ -89,21 +94,21 @@ func QueryExtraFields(r Repository, params *url.Values) {
 }
 
 // FetchContent use repository httpMethod to pull the content
-func FetchContent(r Repository, url string, step FetchStep) (content string, code int, err error) {
+func FetchContent(r Repository, url *url.URL, step FetchStep) (content string, code int, err error) {
 	var resp *http.Response
 
 	switch r.HttpMethod(step) {
 	case http.MethodPost:
-		resp, err = http.Post(url, r.ContentType(), bytes.NewBuffer([]byte{}))
+		resp, err = http.Post(url.String(), r.ContentType(), bytes.NewBuffer([]byte{}))
 	default:
-		resp, err = http.Get(url)
+		resp, err = http.Get(url.String())
 	}
-	defer resp.Body.Close()
-	code = resp.StatusCode
 	if err != nil {
 		return
 	}
+	code = resp.StatusCode
 	body, err := ioutil.ReadAll(resp.Body)
+	resp.Body.Close()
 	return string(body), code, err
 }
 

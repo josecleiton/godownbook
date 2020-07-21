@@ -57,28 +57,14 @@ func fetchInitialData(r repo.Repository) (content string, err error) {
 	log.Println("params", params)
 	u.RawQuery = params.Encode()
 	log.Println("url", u)
-	content, code, err := repo.FetchContent(r, u.String(), repo.RowStep)
+	content, code, err := repo.FetchContent(r, &u, repo.RowStep)
 	if code != 200 {
 		err = errors.New("fetch initial data status code != 200")
 	}
 	return
 }
 
-func fetchBookInfo(r repo.Repository, row *repo.BookRow) (content string, err error) {
-	u := r.BaseURL()
-	log.Println("baseUrl", u)
-	u.Path = row.InfoPage.Path
-	u.RawQuery = row.InfoPage.RawQuery
-	log.Println("fullUrl", u)
-	content, code, err := repo.FetchContent(r, u.String(), repo.InfoPageStep)
-	if code != 200 {
-		err = errors.New("fetch book info status code != 200")
-	}
-	return
-}
-
-func main() {
-
+func debug() {
 	repos := reposToSearch()
 	log.Println(repos)
 	c, _ := fetchInitialData(repos[0])
@@ -90,10 +76,16 @@ func main() {
 	m, _ := repos[0].MaxPageNumber(c)
 	util.PrintMemUsage()
 	log.Println("page", m)
-	page, _ := fetchBookInfo(repos[0], br[0])
+	page, _ := repos[0].BookInfo(br[0])
 	util.PrintMemUsage()
 	log.Println(page)
+	util.PrintMemUsage()
 	os.Exit(0)
+}
+
+func main() {
+	debug()
+
 	if err := ui.Init(); err != nil {
 		log.Fatalf("failed to initialize termui: %v", err)
 	}
