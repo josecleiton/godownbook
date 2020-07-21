@@ -1,6 +1,7 @@
 package book
 
 import (
+	"fmt"
 	"net/url"
 	"strings"
 )
@@ -45,10 +46,6 @@ func New() *Book {
 	}
 }
 
-func (b Book) ToBIB() string {
-	return ""
-}
-
 func (b *Book) Fill(key string, value string) {
 	if strings.HasPrefix(key, title) {
 		b.Title = value
@@ -72,3 +69,22 @@ func (b *Book) Fill(key string, value string) {
 		b.ExtraInfo[key] = value
 	}
 }
+
+func (b Book) ToBIB() string {
+	var url string
+	if b.URL != nil {
+		url = b.URL.String()
+	}
+	return fmt.Sprintf(`@book{book:%s,
+title        =    {%s},
+author       =    {%s},
+publisher    =    {%s},
+isbn         =    {%s},
+year         =    {%s},
+series       =    {%s},
+edition      =    {%s},
+volume       =    {%s},
+url          =    {%s},
+  `, b.ID, b.Title, b.Author, b.Publisher, b.ISBN, b.Year, b.Series, b.Edition, b.Volume, url)
+}
+

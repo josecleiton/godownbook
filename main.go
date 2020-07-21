@@ -64,7 +64,7 @@ func fetchInitialData(r repo.Repository) (content string, err error) {
 	return
 }
 
-func debug() {
+func test() {
 	repos := reposToSearch()
 	log.Println(repos)
 	c, _ := fetchInitialData(repos[0])
@@ -80,11 +80,12 @@ func debug() {
 	util.PrintMemUsage()
 	log.Println(page)
 	util.PrintMemUsage()
+	log.Println(page.ToBIB())
 	os.Exit(0)
 }
 
 func main() {
-	debug()
+	test()
 
 	if err := ui.Init(); err != nil {
 		log.Fatalf("failed to initialize termui: %v", err)

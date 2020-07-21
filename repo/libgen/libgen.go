@@ -332,8 +332,12 @@ func (l LibGen) BookInfo(b *repo.BookRow) (*book.Book, error) {
 		return nil, err
 	}
 	log.Println(trList, len(trList))
-	return bookInfoCrawler(trList, l.baseURL)
-
+	book, err := bookInfoCrawler(trList, l.baseURL)
+	if err != nil {
+		return nil, err
+	}
+	book.URL = &u
+	return book, nil
 }
 
 func aCrawler(node *html.Node) (*html.Node, error) {
