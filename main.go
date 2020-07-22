@@ -6,7 +6,10 @@ import (
 	"log"
 	"net/url"
 	"os"
+	"os/signal"
+	"strconv"
 	"strings"
+	// "syscall"
 
 	ui "github.com/gizak/termui/v3"
 	"github.com/josecleiton/godownbook/repo"
@@ -20,6 +23,7 @@ var verboseFlag bool
 var repository string
 
 var bookTable *w.BookTable
+var bookTree *w.BookTree
 var pageIndicator *w.PageIndicator
 
 var supportedRepositories = map[string]repo.Repository{
@@ -98,30 +102,101 @@ func buildRows(r repo.Repository) (rows [][]string, max int) {
 	return
 }
 
+func makeTreeData(r repo.Repository) (nodes []w.BookNode, max int) {
+	nodes = make([]w.BookNode, r.MaxPerPage())
+	c, err := fetchInitialData(r)
+	handleError(err)
+	br, err := r.GetRows(c)
+	handleError(err)
+	max, err = r.MaxPageNumber(c)
+	handleError(err)
+	for i, row := range br {
+		nodes[i].Title = strconv.Itoa(i+1) + ". " + row.Key(r)
+		nodes[i].Childs = row.Columns
+	}
+	return
+}
+
+func handleError(err error) {
+	if err != nil {
+		log.Fatalln(err)
+	}
+
+}
+
 func setupGrid() *ui.Grid {
 	grid := ui.NewGrid()
-	grid.Set(ui.NewRow(90.0/100, bookTable), ui.NewRow(10.0/100, pageIndicator))
+	grid.Set(ui.NewRow(0.9, bookTree), ui.NewRow(0.1, pageIndicator))
 	return grid
 }
 
 func eventLoop() {
-	for e := range ui.PollEvents() {
-		switch e.ID {
-		case "q", "<C-c>", "<C-z>":
+	sigTerm := make(chan os.Signal)
+	signal.Notify(sigTerm, os.Interrupt)
+	signal.Notify(sigTerm, os.Kill)
+	previousKey := ""
+	uiEvents := ui.PollEvents()
+	l := bookTree
+	for {
+		select {
+		case <-sigTerm:
 			return
+		case e := <-uiEvents:
+			switch e.ID {
+			case "q", "<C-c>":
+				return
+			case "j", "<Down>":
+				l.ScrollDown()
+			case "k", "<Up>":
+				l.ScrollUp()
+			case "<C-d>":
+				l.ScrollHalfPageDown()
+			case "<C-u>":
+				l.ScrollHalfPageUp()
+			case "<C-f>":
+				l.ScrollPageDown()
+			case "<C-b>":
+				l.ScrollPageUp()
+			case "g":
+				if previousKey == "g" {
+					l.ScrollTop()
+				}
+			case "<Home>":
+				l.ScrollTop()
+			case "<Enter>":
+				l.ToggleExpand()
+			case "G", "<End>":
+				l.ScrollBottom()
+			case "E":
+				l.ExpandAll()
+			case "C":
+				l.CollapseAll()
+			case "<Resize>":
+				x, y := ui.TerminalDimensions()
+				l.SetRect(0, 0, x, y)
+			}
+
+			if previousKey == "g" {
+				previousKey = ""
+			} else {
+				previousKey = e.ID
+			}
+			ui.Render(l)
 		}
+
 	}
 }
 
 func main() {
 	repo := reposToSearch()
-	rows, max := buildRows(repo)
+	nodes, max := makeTreeData(repo)
 
 	if err := ui.Init(); err != nil {
 		log.Fatalf("failed to initialize termui: %v", err)
 	}
+	defer func() { util.PrintMemUsage() }()
 	defer ui.Close()
-	bookTable = w.NewBookTable(rows)
+	bookTree = w.NewBookTree(nodes)
 	pageIndicator = w.NewPageIndicator(max)
 	grid := setupGrid()
 	tWidth, tHeight := ui.TerminalDimensions()

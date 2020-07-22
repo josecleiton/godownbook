@@ -3,10 +3,12 @@ package repo
 import (
 	"bytes"
 	"errors"
+	"fmt"
 	"io/ioutil"
 	"net/http"
 	"net/url"
 	"strconv"
+	"strings"
 
 	"github.com/josecleiton/godownbook/book"
 )
@@ -35,6 +37,16 @@ type BookRow struct {
 	Columns  []string
 }
 
+func (b BookRow) Key(r Repository) (key string) {
+	for i, idx := range r.KeyColumns() {
+		if i != 0 {
+			key += fmt.Sprintf("%c ", '|')
+		}
+		key += strings.TrimSpace(b.Columns[idx]) + " "
+	}
+	return
+}
+
 // Repository represents a book repository
 type Repository interface {
 	// HttpMethod returns the http method to fetch content
@@ -51,6 +63,8 @@ type Repository interface {
 	SortField() string
 	// Colums columns from repo
 	Columns() []string
+	// KeyColumn index of main column
+	KeyColumns() []int
 	//SortModeField returns the sort mode field of repository. Ex: ?sortmode=ASC
 	SortModeField() string
 	// SortModeValues returns a map to ascending and descending sort modes

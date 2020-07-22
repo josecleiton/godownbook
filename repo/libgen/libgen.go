@@ -99,6 +99,10 @@ func (l LibGen) Columns() []string {
 	return l.columns
 }
 
+func (LibGen) KeyColumns() []int {
+	return []int{1, 6}
+}
+
 func (l LibGen) SortModeField() string {
 	return l.sortModeField
 }
@@ -208,7 +212,7 @@ func textCrawler(node *html.Node) (string, error) {
 }
 
 func newBookRow(tr *html.Node, rowLen int) (*repo.BookRow, error) {
-	br := &repo.BookRow{Columns: make([]string, 0, rowLen)}
+	br := &repo.BookRow{Columns: make([]string, rowLen)}
 	i := 0
 	for child := tr.FirstChild; child != nil && i < extension; child = child.NextSibling {
 		if child.Type == html.ElementNode && child.Data == "td" {
@@ -236,7 +240,7 @@ func newBookRow(tr *html.Node, rowLen int) (*repo.BookRow, error) {
 				}
 				text = t
 			}
-			br.Columns = append(br.Columns, text)
+			br.Columns[i-1] = text
 			i++
 		}
 	}

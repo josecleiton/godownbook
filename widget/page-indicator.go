@@ -24,6 +24,7 @@ func NewPageIndicator(max int) *PageIndicator {
 	pi.Rows = [][]string{pages}
 	pi.RowSeparator = false
 	pi.TextAlignment = ui.AlignCenter
+	pi.Border = false
 	return pi
 }
 
