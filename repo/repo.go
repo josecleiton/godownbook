@@ -66,6 +66,8 @@ type Repository interface {
 
 	// MaxPageNumber return max page number from content
 	MaxPageNumber(content string) (int, error)
+
+	MaxPerPage() int
 }
 
 // QueryPage appends pagination field to url params

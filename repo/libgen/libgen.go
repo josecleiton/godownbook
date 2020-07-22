@@ -115,6 +115,10 @@ func (LibGen) ContentType() string {
 	return ""
 }
 
+func (LibGen) MaxPerPage() int {
+	return BOOKS_PER_PAGE
+}
+
 func bodyCrawler(node *html.Node) (*html.Node, error) {
 	if node.Type == html.ElementNode && node.Data == "body" {
 		return node, nil
