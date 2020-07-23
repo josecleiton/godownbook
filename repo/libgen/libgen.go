@@ -3,10 +3,6 @@ package libgen
 import (
 	"errors"
 	"fmt"
-	"image"
-	_ "image/gif"
-	_ "image/jpeg"
-	_ "image/png"
 	"log"
 	"net/http"
 	"net/url"
@@ -413,20 +409,6 @@ func attribsToMap(node *html.Node) map[string]string {
 	return attribs
 }
 
-func fetchImage(url *url.URL) (*image.Image, error) {
-	resp, err := util.Fetch(url, http.MethodGet, nil)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-	img, _, err := image.Decode(resp.Body)
-	if err != nil {
-		return nil, err
-	}
-	log.Println("image fetched", url.String())
-	return &img, nil
-}
-
 func bookInfoCrawlerTdCover(node *html.Node, b *book.Book, base *url.URL) error {
 	a, err := aCrawler(node)
 	if err != nil {
@@ -439,21 +421,16 @@ func bookInfoCrawlerTdCover(node *html.Node, b *book.Book, base *url.URL) error 
 	coverUrl := &url.URL{}
 	*coverUrl = *base
 	coverUrl.Path = foundAttrib(img, "src")
-	b.Cover, err = fetchImage(coverUrl)
+	b.Cover, err = util.FetchImage(coverUrl)
 	return err
-}
-
-func bookInfoCrawlerTd(node *html.Node, b *book.Book) error {
-	return nil
-
 }
 
 func bookInfoCrawlerTrCover(node *html.Node, b *book.Book, base *url.URL) error {
 	var values [2]string
-	i := -1
+	i := 0
 	for child := node.FirstChild; child != nil; child = child.NextSibling {
 		if child.Type == html.ElementNode && child.Data == "td" {
-			if i == -1 {
+			if i == 0 {
 				err := bookInfoCrawlerTdCover(child, b, base)
 				if err != nil {
 					return err
@@ -461,7 +438,7 @@ func bookInfoCrawlerTrCover(node *html.Node, b *book.Book, base *url.URL) error 
 				i++
 				continue
 			}
-			bookInfoCrawlerKeyValue(child, b, &values, i)
+			bookInfoCrawlerKeyValue(child, b, &values, i-1)
 			i++
 		}
 	}
