@@ -16,6 +16,7 @@ const (
 	year      = "Year"
 	edition   = "Edition"
 	extension = "Extension"
+	page      = "Pages"
 )
 
 type Book struct {
@@ -65,6 +66,8 @@ func (b *Book) Fill(key string, value string) {
 		b.Edition = value
 	} else if strings.HasPrefix(key, extension) {
 		b.Extension = value
+	} else if strings.HasPrefix(key, page) {
+		b.Pages = value
 	} else if value != "" {
 		b.ExtraInfo[key] = value
 	}

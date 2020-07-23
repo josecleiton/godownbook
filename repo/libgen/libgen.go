@@ -100,7 +100,7 @@ func (l LibGen) Columns() []string {
 }
 
 func (LibGen) KeyColumns() []int {
-	return []int{1, 6}
+	return []int{1, 6, 7}
 }
 
 func (l LibGen) SortModeField() string {
@@ -214,7 +214,7 @@ func textCrawler(node *html.Node) (string, error) {
 func newBookRow(tr *html.Node, rowLen int) (*repo.BookRow, error) {
 	br := &repo.BookRow{Columns: make([]string, rowLen)}
 	i := 0
-	for child := tr.FirstChild; child != nil && i < extension; child = child.NextSibling {
+	for child := tr.FirstChild; child != nil && i <= extension; child = child.NextSibling {
 		if child.Type == html.ElementNode && child.Data == "td" {
 			// skip ID
 			if i == id {

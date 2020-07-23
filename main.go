@@ -22,9 +22,11 @@ var searchPattern string
 var verboseFlag bool
 var repository string
 
+var uiClosed bool
 var bookTable *w.BookTable
 var bookTree *w.BookTree
 var pageIndicator *w.PageIndicator
+var grid *ui.Grid
 
 var supportedRepositories = map[string]repo.Repository{
 	"libgen": libgen.Make(),
@@ -102,22 +104,37 @@ func buildRows(r repo.Repository) (rows [][]string, max int) {
 	return
 }
 
-func makeTreeData(r repo.Repository) (nodes []w.BookNode, max int) {
-	nodes = make([]w.BookNode, r.MaxPerPage())
+func makeTreeData(r repo.Repository) ([]w.BookNode, int) {
+	nodes := make([]w.BookNode, r.MaxPerPage())
 	c, err := fetchInitialData(r)
 	handleError(err)
 	br, err := r.GetRows(c)
 	handleError(err)
-	max, err = r.MaxPageNumber(c)
+	max, err := r.MaxPageNumber(c)
 	handleError(err)
+	keyColumns := r.KeyColumns()
+	keyBitmap := make(map[int]bool, len(keyColumns))
+	columns := r.Columns()
+	for _, idx := range keyColumns {
+		keyBitmap[idx] = true
+	}
 	for i, row := range br {
 		nodes[i].Title = strconv.Itoa(i+1) + ". " + row.Key(r)
-		nodes[i].Childs = row.Columns
+		nodes[i].Childs = make([]string, 0, len(row.Columns)-len(keyBitmap))
+		for j, col := range row.Columns {
+			if !keyBitmap[j] {
+				nodes[i].Childs = append(nodes[i].Childs, columns[j]+": "+col)
+			}
+		}
 	}
-	return
+	return nodes, max
 }
 
 func handleError(err error) {
+	if grid != nil {
+		ui.Close()
+		uiClosed = true
+	}
 	if err != nil {
 		log.Fatalln(err)
 	}
@@ -181,13 +198,14 @@ func eventLoop() {
 			} else {
 				previousKey = e.ID
 			}
-			ui.Render(l)
+			ui.Render(grid)
 		}
 
 	}
 }
 
 func main() {
+	// test()
 	repo := reposToSearch()
 	nodes, max := makeTreeData(repo)
 
@@ -195,10 +213,14 @@ func main() {
 		log.Fatalf("failed to initialize termui: %v", err)
 	}
 	defer func() { util.PrintMemUsage() }()
-	defer ui.Close()
+	defer func() {
+		if !uiClosed {
+			ui.Close()
+		}
+	}()
 	bookTree = w.NewBookTree(nodes)
 	pageIndicator = w.NewPageIndicator(max)
-	grid := setupGrid()
+	grid = setupGrid()
 	tWidth, tHeight := ui.TerminalDimensions()
 	grid.SetRect(0, 0, tWidth, tHeight)
 	ui.Render(grid)
