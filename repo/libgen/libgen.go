@@ -12,6 +12,7 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/josecleiton/godownbook/book"
 	"github.com/josecleiton/godownbook/repo"
@@ -622,6 +623,7 @@ func sendDownProgress(out *os.File, total int, progress chan float64, done chan 
 				return
 			}
 			progress <- float64(fi.Size()) / float64(total)
+			time.Sleep(500 * time.Millisecond)
 		}
 	}
 }
@@ -631,11 +633,11 @@ func downBookFile(u *url.URL, dest string, progress chan float64) (*os.File, err
 	if err != nil {
 		return nil, err
 	}
-	cLen, err := util.FetchHeader(u, "Content-Length")
+	contentLen, err := util.FetchHeader(u, "Content-Length")
 	if err != nil {
 		return nil, err
 	}
-	size, err := strconv.Atoi(cLen)
+	size, err := strconv.Atoi(contentLen)
 	if err != nil {
 		return nil, err
 	}

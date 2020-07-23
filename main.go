@@ -26,7 +26,6 @@ var searchPattern string
 var verboseFlag bool
 var repository string
 var configPath string
-var configFormat string
 
 var uiClosed bool
 var bookTable *w.BookTable
@@ -43,22 +42,30 @@ func init() {
 	if err != nil {
 		log.Fatalln(err)
 	}
-	cfgDir, err := os.UserConfigDir()
+	ucdir, err := os.UserConfigDir()
 	if err != nil {
 		log.Fatalln(err)
 	}
-	flag.StringVar(&configFormat, "cf", "json", "config format [json, yaml]")
-	flag.StringVar(&configPath, "c", filepath.Join(cfgDir, "godownbook", "config."+configFormat), "config file path")
+	cfgdir := filepath.Join(ucdir, "godownbook")
+	flag.StringVar(&configPath, "c", filepath.Join(cfgdir, "config.json"), "config file path")
 	flag.StringVar(&searchPattern, "s", "", "book title to search")
 	flag.BoolVar(&verboseFlag, "v", false, "verbose log")
 	flag.StringVar(&repository, "r", "", "where to lookup book")
 	flag.Parse()
-	err = config.UserConfig.Parse(configPath)
-	if err != nil {
-		log.Println(err)
-	}
+	parseConfigFile(cfgdir)
 	if repository == "" {
 		repository = config.UserConfig.DefaultRepo
+	}
+}
+func parseConfigFile(cdir string) {
+	exts := [2]string{config.JSON, config.YAML}
+	for _, ext := range exts {
+		fp := "config." + ext
+		log.Printf("trying config file \"%s\"", fp)
+		if err := config.UserConfig.Parse(filepath.Join(cdir, fp)); err == nil {
+			log.Printf("config file \"%s\" loaded", fp)
+			return
+		}
 	}
 }
 
