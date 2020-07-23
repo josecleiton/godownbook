@@ -6,6 +6,7 @@ import (
 	"log"
 	"net/url"
 	"os"
+	"os/exec"
 	"os/signal"
 	"path/filepath"
 	"strconv"
@@ -74,17 +75,18 @@ func test() {
 	log.Println(b)
 	util.PrintMemUsage()
 	log.Println(b.ToBIB())
-	cFile := make(chan *os.File)
+	cf := make(chan *os.File)
 	progress := make(chan float64)
 	dest := filepath.Join(config.UserConfig.OutDirBib, b.ToPath())
 	downloader, err := repo.DownloadBook("Libgen.lc")
 	if err != nil {
 		log.Fatalln(err)
 	}
-	go downloader.Exec(b.Mirrors["Libgen.lc"], dest, cFile, progress)
+	util.PrintMemUsage()
+	go downloader.Exec(b.Mirrors["Libgen.lc"], dest, cf, progress)
 	for {
 		select {
-		case f := <-cFile:
+		case f := <-cf:
 			util.PrintMemUsage()
 			if f == nil {
 				log.Fatalln(errors.New("download fail"))
@@ -99,6 +101,12 @@ func test() {
 			defer bib.Close()
 			if _, err = bib.WriteString(b.ToBIB()); err != nil {
 				log.Fatalln(err)
+			}
+			if userCmd := config.UserConfig.ExecCmd; userCmd != "" {
+				cmd := exec.Command(userCmd, f.Name(), bib.Name())
+				if err := cmd.Start(); err != nil {
+					log.Fatalln(err)
+				}
 			}
 			util.PrintMemUsage()
 			os.Exit(0)

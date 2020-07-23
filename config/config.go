@@ -20,8 +20,7 @@ type Config struct {
 	OutDir      string
 	OutDirBib   string
 	DefaultRepo string
-	PipeCmd     string
-	PipeFormat  string
+	ExecCmd     string
 	TermUi      bool
 }
 
@@ -36,7 +35,6 @@ func Init() (err error) {
 		OutDir:      homeDir,
 		OutDirBib:   homeDir,
 		DefaultRepo: "libgen",
-		PipeFormat:  JSON,
 		TermUi:      true,
 	}
 	return
