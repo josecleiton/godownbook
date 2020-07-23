@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/url"
+	"os"
 	"strconv"
 	"strings"
 
@@ -74,13 +75,14 @@ type Repository interface {
 	ContentType() string
 	// GetRows return rows from content
 	GetRows(content string) ([]*BookRow, error)
-
+	// BookInfo returns a book from row
 	BookInfo(*BookRow) (*book.Book, error)
-
 	// MaxPageNumber return max page number from content
 	MaxPageNumber(content string) (int, error)
-
+	// MaxPerPage returns the n of rows per page
 	MaxPerPage() int
+	// DownloadBook put book file in outDir
+	DownloadBook(mirror string, u *url.URL, cf chan *os.File, progress chan float64)
 }
 
 // QueryPage appends pagination field to url params

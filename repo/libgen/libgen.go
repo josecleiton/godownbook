@@ -3,9 +3,12 @@ package libgen
 import (
 	"errors"
 	"fmt"
+	"io"
+	"io/ioutil"
 	"log"
 	"net/http"
 	"net/url"
+	"os"
 	"regexp"
 	"strconv"
 	"strings"
@@ -122,6 +125,22 @@ func (LibGen) ContentType() string {
 
 func (LibGen) MaxPerPage() int {
 	return BOOKS_PER_PAGE
+}
+
+func (LibGen) DownloadBook(mirror string, u *url.URL, done chan *os.File, progress chan float64) {
+	var tmpFile *os.File
+	var err error
+	switch mirror {
+	case "Gen.lib.rus.ec", "Libgen.lc":
+		tmpFile, err = downBookGenLib(u, progress)
+	default:
+		err = errors.New(fmt.Sprintf("libgen: not supported mirror - %v\n", mirror))
+	}
+	if err != nil {
+		log.Println(err)
+		done <- nil
+	}
+	done <- tmpFile
 }
 
 func bodyCrawler(node *html.Node) (*html.Node, error) {
@@ -298,8 +317,8 @@ func (LibGen) MaxPageNumber(content string) (int, error) {
 			inEl := child.FirstChild
 			if strings.Contains(inEl.Data, "Paginator") {
 				re := regexp.MustCompile("\\d+")
-				raw := re.Find([]byte(inEl.Data))
-				return strconv.Atoi(string(raw))
+				raw := re.FindString(inEl.Data)
+				return strconv.Atoi(raw)
 			}
 		}
 	}
@@ -558,4 +577,71 @@ func bookInfoCrawler(trList []*html.Node, base *url.URL) (*book.Book, error) {
 		}
 	}
 	return b, err
+}
+
+func urlFromGETText(content string) (*url.URL, error) {
+	re := regexp.MustCompile("<a.+href=\"(.+)\".+GET")
+	matches := re.FindStringSubmatch(strings.ReplaceAll(content, "\n", ""))
+	if len(matches) <= 1 {
+		return nil, errors.New(fmt.Sprintf("libgen: no match found for regexp %v", re))
+	}
+	return url.Parse(matches[1])
+}
+
+func downBookGenLib(u *url.URL, progress chan float64) (*os.File, error) {
+	resp, err := util.Fetch(u, http.MethodGet, nil)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+	body, err := ioutil.ReadAll(resp.Body)
+	link, err := urlFromGETText(string(body))
+	return downBookFile(link, progress)
+}
+
+func sendDownProgress(out *os.File, total int, progress chan float64, done chan bool) {
+	for {
+		select {
+		case <-done:
+			return
+		default:
+			fi, err := out.Stat()
+			if err != nil {
+				log.Println(err)
+				return
+			}
+			progress <- float64(fi.Size()) / float64(total)
+		}
+	}
+}
+
+func downBookFile(u *url.URL, progress chan float64) (*os.File, error) {
+	out, err := ioutil.TempFile(os.TempDir(), "godownbook-")
+	if err != nil {
+		return nil, err
+	}
+	url := u.String()
+	resp, err := http.Head(url)
+	if err != nil {
+		return nil, err
+	}
+	size, err := strconv.Atoi(resp.Header.Get("Content-Length"))
+	resp.Body.Close()
+	if err != nil {
+		return nil, err
+	}
+	done := make(chan bool)
+	go sendDownProgress(out, size, progress, done)
+	resp, err = http.Get(url)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+	_, err = io.Copy(out, resp.Body)
+	if err != nil {
+		return nil, err
+	}
+	done <- true
+	return out, nil
+
 }

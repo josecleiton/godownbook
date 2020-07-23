@@ -7,11 +7,14 @@ import (
 	"net/url"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"strconv"
 	"strings"
+
 	// "syscall"
 
 	ui "github.com/gizak/termui/v3"
+	"github.com/josecleiton/godownbook/config"
 	"github.com/josecleiton/godownbook/repo"
 	"github.com/josecleiton/godownbook/repo/libgen"
 	"github.com/josecleiton/godownbook/util"
@@ -21,6 +24,8 @@ import (
 var searchPattern string
 var verboseFlag bool
 var repository string
+var configPath string
+var configFormat string
 
 var uiClosed bool
 var bookTable *w.BookTable
@@ -33,6 +38,17 @@ var supportedRepositories = map[string]repo.Repository{
 }
 
 func init() {
+	cfgDir, err := os.UserConfigDir()
+	if err != nil {
+		log.Fatalln(err)
+	}
+	flag.StringVar(&configFormat, "cf", "json", "config format [json, yaml]")
+	flag.StringVar(&configPath, "c", filepath.Join(cfgDir, "godownbook", "config."+configFormat), "config file path")
+	err = config.UserConfig.Parse(configPath)
+	if err != nil {
+		log.Println(err)
+	}
+	log.Println(*config.UserConfig)
 	flag.StringVar(&searchPattern, "s", "", "book title to search")
 	flag.BoolVar(&verboseFlag, "v", false, "verbose log")
 	flag.StringVar(&repository, "r", "", "where to lookup book")
@@ -205,7 +221,7 @@ func eventLoop() {
 }
 
 func main() {
-	test()
+	// test()
 	repo := reposToSearch()
 	nodes, max := makeTreeData(repo)
 
