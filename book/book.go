@@ -2,6 +2,7 @@ package book
 
 import (
 	"fmt"
+	"image"
 	"net/url"
 	"strings"
 )
@@ -33,7 +34,7 @@ type Book struct {
 	Volume    string
 	URL       *url.URL
 	Language  string
-	Cover     *url.URL
+	Cover     *image.Image
 	Synopsis  string
 	Pages     string
 	Mirrors   map[string]*url.URL

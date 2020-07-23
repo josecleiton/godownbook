@@ -3,6 +3,10 @@ package libgen
 import (
 	"errors"
 	"fmt"
+	"image"
+	_ "image/gif"
+	_ "image/jpeg"
+	_ "image/png"
 	"log"
 	"net/http"
 	"net/url"
@@ -12,6 +16,7 @@ import (
 
 	"github.com/josecleiton/godownbook/book"
 	"github.com/josecleiton/godownbook/repo"
+	"github.com/josecleiton/godownbook/util"
 	"golang.org/x/net/html"
 )
 
@@ -408,6 +413,20 @@ func attribsToMap(node *html.Node) map[string]string {
 	return attribs
 }
 
+func fetchImage(url *url.URL) (*image.Image, error) {
+	resp, err := util.Fetch(url, http.MethodGet, nil)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+	img, _, err := image.Decode(resp.Body)
+	if err != nil {
+		return nil, err
+	}
+	log.Println("image fetched", url.String())
+	return &img, nil
+}
+
 func bookInfoCrawlerTdCover(node *html.Node, b *book.Book, base *url.URL) error {
 	a, err := aCrawler(node)
 	if err != nil {
@@ -417,10 +436,11 @@ func bookInfoCrawlerTdCover(node *html.Node, b *book.Book, base *url.URL) error 
 	if err != nil {
 		return err
 	}
-	b.Cover = &url.URL{}
-	*b.Cover = *base
-	b.Cover.Path = foundAttrib(img, "src")
-	return nil
+	coverUrl := &url.URL{}
+	*coverUrl = *base
+	coverUrl.Path = foundAttrib(img, "src")
+	b.Cover, err = fetchImage(coverUrl)
+	return err
 }
 
 func bookInfoCrawlerTd(node *html.Node, b *book.Book) error {

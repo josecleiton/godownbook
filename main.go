@@ -205,7 +205,7 @@ func eventLoop() {
 }
 
 func main() {
-	// test()
+	test()
 	repo := reposToSearch()
 	nodes, max := makeTreeData(repo)
 

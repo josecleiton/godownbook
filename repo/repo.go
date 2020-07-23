@@ -1,16 +1,15 @@
 package repo
 
 import (
-	"bytes"
 	"errors"
 	"fmt"
 	"io/ioutil"
-	"net/http"
 	"net/url"
 	"strconv"
 	"strings"
 
 	"github.com/josecleiton/godownbook/book"
+	"github.com/josecleiton/godownbook/util"
 )
 
 // SortMode search sort mode
@@ -111,20 +110,12 @@ func QueryExtraFields(r Repository, params *url.Values) {
 
 // FetchContent use repository httpMethod to pull the content
 func FetchContent(r Repository, url *url.URL, step FetchStep) (content string, code int, err error) {
-	var resp *http.Response
-
-	switch r.HttpMethod(step) {
-	case http.MethodPost:
-		resp, err = http.Post(url.String(), r.ContentType(), bytes.NewBuffer([]byte{}))
-	default:
-		resp, err = http.Get(url.String())
-	}
+	resp, err := util.Fetch(url, r.HttpMethod(step), &util.FetchBody{ContentType: r.ContentType()})
 	if err != nil {
 		return
 	}
-	code = resp.StatusCode
 	body, err := ioutil.ReadAll(resp.Body)
 	resp.Body.Close()
-	return string(body), code, err
+	return string(body), resp.StatusCode, err
 }
 
