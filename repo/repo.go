@@ -28,6 +28,10 @@ const (
 	DownloadStep
 )
 
+type Downloader interface {
+	Exec(u *url.URL, dest string, file chan *os.File, progress chan float64)
+}
+
 // ContentError generic error on parsing content
 var ContentError = errors.New("content parsing error")
 
@@ -82,7 +86,7 @@ type Repository interface {
 	// MaxPerPage returns the n of rows per page
 	MaxPerPage() int
 	// DownloadBook put book file in outDir
-	DownloadBook(mirror string, u *url.URL, cf chan *os.File, progress chan float64)
+	DownloadBook(mirror string) (Downloader, error)
 }
 
 // QueryPage appends pagination field to url params

@@ -44,3 +44,12 @@ func FetchImage(url *url.URL) (*image.Image, error) {
 	}
 	return &img, nil
 }
+
+func FetchHeader(url *url.URL, header string) (string, error) {
+	resp, err := http.Head(url.String())
+	if err != nil {
+		return "", err
+	}
+	resp.Body.Close()
+	return resp.Header.Get(header), nil
+}

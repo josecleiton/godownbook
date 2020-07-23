@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"image"
 	"net/url"
+	"regexp"
 	"strings"
 )
 
@@ -89,6 +90,28 @@ series       =    {%s},
 edition      =    {%s},
 volume       =    {%s},
 url          =    {%s},
-  `, b.ID, b.Title, b.Author, b.Publisher, b.ISBN, b.Year, b.Series, b.Edition, b.Volume, url)
+}`, b.ID, b.Title, b.Author, b.Publisher, b.ISBN, b.Year, b.Series, b.Edition, b.Volume, url)
 }
 
+func (b Book) titlePath() (t string) {
+	re := regexp.MustCompile("[[:punct:]]|_|[[:space:]]+")
+	for i, s := range re.Split(b.Title, -1) {
+		if s != "" {
+			if i != 0 {
+				t += "-"
+			}
+			t += s
+		}
+	}
+	return
+}
+
+func (b Book) ToPath() string {
+	p := b.titlePath()
+	return strings.ToLower(p + "." + b.Extension)
+}
+
+func (b Book) ToPathBIB() string {
+	p := strings.ToLower(b.titlePath())
+	return p + ".bib"
+}

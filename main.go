@@ -38,21 +38,27 @@ var supportedRepositories = map[string]repo.Repository{
 }
 
 func init() {
+	err := config.Init()
+	if err != nil {
+		log.Fatalln(err)
+	}
 	cfgDir, err := os.UserConfigDir()
 	if err != nil {
 		log.Fatalln(err)
 	}
 	flag.StringVar(&configFormat, "cf", "json", "config format [json, yaml]")
 	flag.StringVar(&configPath, "c", filepath.Join(cfgDir, "godownbook", "config."+configFormat), "config file path")
-	err = config.UserConfig.Parse(configPath)
-	if err != nil {
-		log.Println(err)
-	}
-	log.Println(*config.UserConfig)
 	flag.StringVar(&searchPattern, "s", "", "book title to search")
 	flag.BoolVar(&verboseFlag, "v", false, "verbose log")
 	flag.StringVar(&repository, "r", "", "where to lookup book")
 	flag.Parse()
+	err = config.UserConfig.Parse(configPath)
+	if err != nil {
+		log.Println(err)
+	}
+	if repository == "" {
+		repository = config.UserConfig.DefaultRepo
+	}
 }
 
 func test() {
@@ -63,12 +69,43 @@ func test() {
 	m, _ := repo.MaxPageNumber(c)
 	util.PrintMemUsage()
 	log.Println("page", m)
-	page, _ := repo.BookInfo(br[0])
+	b, _ := repo.BookInfo(br[0])
 	util.PrintMemUsage()
-	log.Println(page)
+	log.Println(b)
 	util.PrintMemUsage()
-	log.Println(page.ToBIB())
-	os.Exit(0)
+	log.Println(b.ToBIB())
+	cFile := make(chan *os.File)
+	progress := make(chan float64)
+	dest := filepath.Join(config.UserConfig.OutDirBib, b.ToPath())
+	downloader, err := repo.DownloadBook("Libgen.lc")
+	if err != nil {
+		log.Fatalln(err)
+	}
+	go downloader.Exec(b.Mirrors["Libgen.lc"], dest, cFile, progress)
+	for {
+		select {
+		case f := <-cFile:
+			util.PrintMemUsage()
+			if f == nil {
+				log.Fatalln(errors.New("download fail"))
+			}
+			defer f.Close()
+			log.Println(f.Name())
+			log.Println("dowloaded", b.ToPath(), b.Title)
+			bib, err := os.Create(filepath.Join(config.UserConfig.OutDirBib, b.ToPathBIB()))
+			if err != nil {
+				log.Fatalln(err)
+			}
+			defer bib.Close()
+			if _, err = bib.WriteString(b.ToBIB()); err != nil {
+				log.Fatalln(err)
+			}
+			util.PrintMemUsage()
+			os.Exit(0)
+		case p := <-progress:
+			log.Println(p)
+		}
+	}
 }
 
 func reposToSearch() repo.Repository {
@@ -221,7 +258,7 @@ func eventLoop() {
 }
 
 func main() {
-	// test()
+	test()
 	repo := reposToSearch()
 	nodes, max := makeTreeData(repo)
 

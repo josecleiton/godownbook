@@ -48,6 +48,9 @@ type LibGen struct {
 	httpMethods     map[repo.FetchStep]string
 }
 
+type Downloader struct {
+}
+
 func Make() LibGen {
 	base, _ := url.Parse("http://gen.lib.rus.ec/search.php")
 	return LibGen{
@@ -127,20 +130,39 @@ func (LibGen) MaxPerPage() int {
 	return BOOKS_PER_PAGE
 }
 
-func (LibGen) DownloadBook(mirror string, u *url.URL, done chan *os.File, progress chan float64) {
-	var tmpFile *os.File
-	var err error
+func (LibGen) DownloadBook(mirror string) (downloader repo.Downloader, err error) {
 	switch mirror {
 	case "Gen.lib.rus.ec", "Libgen.lc":
-		tmpFile, err = downBookGenLib(u, progress)
+		downloader = Downloader{}
 	default:
 		err = errors.New(fmt.Sprintf("libgen: not supported mirror - %v\n", mirror))
 	}
+	return
+}
+
+func (Downloader) Exec(u *url.URL, dest string, file chan *os.File, progress chan float64) {
+	resp, err := util.Fetch(u, http.MethodGet, nil)
 	if err != nil {
-		log.Println(err)
-		done <- nil
+		file <- nil
+		return
 	}
-	done <- tmpFile
+	defer resp.Body.Close()
+	body, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		file <- nil
+		return
+	}
+	link, err := urlFromGETText(string(body))
+	if err != nil {
+		file <- nil
+		return
+	}
+	f, err := downBookFile(link, dest, progress)
+	if err != nil {
+		file <- nil
+		return
+	}
+	file <- f
 }
 
 func bodyCrawler(node *html.Node) (*html.Node, error) {
@@ -588,17 +610,6 @@ func urlFromGETText(content string) (*url.URL, error) {
 	return url.Parse(matches[1])
 }
 
-func downBookGenLib(u *url.URL, progress chan float64) (*os.File, error) {
-	resp, err := util.Fetch(u, http.MethodGet, nil)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-	body, err := ioutil.ReadAll(resp.Body)
-	link, err := urlFromGETText(string(body))
-	return downBookFile(link, progress)
-}
-
 func sendDownProgress(out *os.File, total int, progress chan float64, done chan bool) {
 	for {
 		select {
@@ -615,33 +626,30 @@ func sendDownProgress(out *os.File, total int, progress chan float64, done chan 
 	}
 }
 
-func downBookFile(u *url.URL, progress chan float64) (*os.File, error) {
-	out, err := ioutil.TempFile(os.TempDir(), "godownbook-")
+func downBookFile(u *url.URL, dest string, progress chan float64) (*os.File, error) {
+	out, err := os.Create(dest)
 	if err != nil {
 		return nil, err
 	}
-	url := u.String()
-	resp, err := http.Head(url)
+	cLen, err := util.FetchHeader(u, "Content-Length")
 	if err != nil {
 		return nil, err
 	}
-	size, err := strconv.Atoi(resp.Header.Get("Content-Length"))
-	resp.Body.Close()
+	size, err := strconv.Atoi(cLen)
 	if err != nil {
 		return nil, err
 	}
 	done := make(chan bool)
+	defer func() {
+		done <- true
+		log.Println("completed")
+	}()
 	go sendDownProgress(out, size, progress, done)
-	resp, err = http.Get(url)
+	resp, err := http.Get(u.String())
 	if err != nil {
 		return nil, err
 	}
 	defer resp.Body.Close()
 	_, err = io.Copy(out, resp.Body)
-	if err != nil {
-		return nil, err
-	}
-	done <- true
-	return out, nil
-
+	return out, err
 }

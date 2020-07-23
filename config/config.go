@@ -25,13 +25,21 @@ type Config struct {
 	TermUi      bool
 }
 
-var UserConfig *Config = &Config{
-	OutDir:      "./",
-	OutDirBib:   "./",
-	DefaultRepo: "libgen",
-	PipeCmd:     "./cmd.sh",
-	PipeFormat:  JSON,
-	TermUi:      true,
+var UserConfig *Config
+
+func Init() (err error) {
+	homeDir, err := os.UserConfigDir()
+	if err != nil {
+		return
+	}
+	UserConfig = &Config{
+		OutDir:      homeDir,
+		OutDirBib:   homeDir,
+		DefaultRepo: "libgen",
+		PipeFormat:  JSON,
+		TermUi:      true,
+	}
+	return
 }
 
 func (c *Config) Parse(fp string) error {
