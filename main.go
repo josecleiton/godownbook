@@ -28,8 +28,8 @@ var repository string
 var configPath string
 
 var uiClosed bool
-var bookTable *w.BookTable
-var bookTree *w.BookTree
+var bRows []*repo.BookRow
+var bookList *w.BookList
 var pageIndicator *w.PageIndicator
 var grid *ui.Grid
 
@@ -123,6 +123,11 @@ func test() {
 	}
 }
 
+func screenResize() {
+	tw, th := ui.TerminalDimensions()
+	grid.SetRect(0, 0, tw, th)
+}
+
 func reposToSearch() repo.Repository {
 	if supportedRepositories[repository] == nil {
 		keys := make([]string, 0, len(supportedRepositories))
@@ -150,54 +155,6 @@ func fetchInitialData(r repo.Repository) (content string, err error) {
 	return
 }
 
-func buildRows(r repo.Repository) (rows [][]string, max int) {
-	rows = make([][]string, r.MaxPerPage()+1)
-	rows[0] = r.Columns()
-	c, err := fetchInitialData(r)
-	if err != nil {
-		log.Fatalln(err)
-	}
-	br, err := r.GetRows(c)
-	if err != nil {
-		log.Fatalln(err)
-	}
-	max, err = r.MaxPageNumber(c)
-	if err != nil {
-		log.Fatalln(err)
-	}
-	for i := 0; i < r.MaxPerPage(); i++ {
-		rows[i+1] = br[i].Columns
-	}
-
-	return
-}
-
-func makeTreeData(r repo.Repository) ([]w.BookNode, int) {
-	nodes := make([]w.BookNode, r.MaxPerPage())
-	c, err := fetchInitialData(r)
-	handleError(err)
-	br, err := r.GetRows(c)
-	handleError(err)
-	max, err := r.MaxPageNumber(c)
-	handleError(err)
-	keyColumns := r.KeyColumns()
-	keyBitmap := make(map[int]bool, len(keyColumns))
-	columns := r.Columns()
-	for _, idx := range keyColumns {
-		keyBitmap[idx] = true
-	}
-	for i, row := range br {
-		nodes[i].Title = strconv.Itoa(i+1) + ". " + row.Key(r)
-		nodes[i].Childs = make([]string, 0, len(row.Columns)-len(keyBitmap))
-		for j, col := range row.Columns {
-			if !keyBitmap[j] {
-				nodes[i].Childs = append(nodes[i].Childs, columns[j]+": "+col)
-			}
-		}
-	}
-	return nodes, max
-}
-
 func handleError(err error) {
 	if grid != nil {
 		ui.Close()
@@ -206,12 +163,11 @@ func handleError(err error) {
 	if err != nil {
 		log.Fatalln(err)
 	}
-
 }
 
 func setupGrid() *ui.Grid {
 	grid := ui.NewGrid()
-	grid.Set(ui.NewRow(0.9, bookTree), ui.NewRow(0.1, pageIndicator))
+	grid.Set(ui.NewRow(0.9, bookList), ui.NewRow(0.1, pageIndicator))
 	return grid
 }
 
@@ -221,7 +177,7 @@ func eventLoop() {
 	signal.Notify(sigTerm, os.Kill)
 	previousKey := ""
 	uiEvents := ui.PollEvents()
-	l := bookTree
+	l := bookList
 	for {
 		select {
 		case <-sigTerm:
@@ -251,16 +207,11 @@ func eventLoop() {
 			case "<Home>":
 				l.ScrollTop()
 			case "<Enter>":
-				l.ToggleExpand()
+				break
 			case "G", "<End>":
 				l.ScrollBottom()
-			case "E":
-				l.ExpandAll()
-			case "C":
-				l.CollapseAll()
 			case "<Resize>":
-				x, y := ui.TerminalDimensions()
-				l.SetRect(0, 0, x, y)
+				screenResize()
 			}
 
 			if num, err := strconv.Atoi(e.ID); (num > 0 || previousKey != "") && err == nil {
@@ -291,7 +242,7 @@ func eventLoop() {
 func main() {
 	// test()
 	repo := reposToSearch()
-	nodes, max := makeTreeData(repo)
+	nodes, max := makeListData(repo)
 
 	if err := ui.Init(); err != nil {
 		log.Fatalf("failed to initialize termui: %v", err)
@@ -302,11 +253,10 @@ func main() {
 			ui.Close()
 		}
 	}()
-	bookTree = w.NewBookTree(nodes)
+	bookList = w.NewBookList(nodes)
 	pageIndicator = w.NewPageIndicator(max)
 	grid = setupGrid()
-	tWidth, tHeight := ui.TerminalDimensions()
-	grid.SetRect(0, 0, tWidth, tHeight)
+	screenResize()
 	ui.Render(grid)
 
 	eventLoop()

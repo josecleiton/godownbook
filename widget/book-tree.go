@@ -16,11 +16,6 @@ func (nv nodeValue) String() string {
 	return string(nv)
 }
 
-type BookNode struct {
-	Title  string
-	Childs []string
-}
-
 func NewBookTree(nodes []BookNode) *BookTree {
 	tree := &BookTree{}
 	tree.Tree = *w.NewTree()

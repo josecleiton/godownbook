@@ -21,6 +21,7 @@ type Config struct {
 	OutDirBib   string
 	DefaultRepo string
 	ExecCmd     string
+	Delimiter   string
 	TermUi      bool
 }
 
@@ -35,6 +36,7 @@ func Init() (err error) {
 		OutDir:      homeDir,
 		OutDirBib:   homeDir,
 		DefaultRepo: "libgen",
+		Delimiter:   "|",
 		TermUi:      true,
 	}
 	return

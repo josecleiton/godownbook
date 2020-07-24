@@ -45,6 +45,7 @@ type LibGen struct {
 	sortModeField   string
 	sortModeValues  map[repo.SortMode]string
 	columns         []string
+	keyColumns      []int
 	extraFields     map[string]string
 	httpMethods     map[repo.FetchStep]string
 }
@@ -61,6 +62,7 @@ func Make() LibGen {
 		sortEnabled:     true,
 		sortField:       "sort",
 		columns:         []string{"Author", "Title", "Publisher", "Year", "Pages", "Language", "Filesize", "Extension"},
+		keyColumns:      []int{1, 6, 7, 3},
 		sortModeField:   "sortmode",
 		sortModeValues: map[repo.SortMode]string{
 			repo.ASC:  "ASC",
@@ -107,8 +109,8 @@ func (l LibGen) Columns() []string {
 	return l.columns
 }
 
-func (LibGen) KeyColumns() []int {
-	return []int{1, 6, 7}
+func (l LibGen) KeyColumns() []int {
+	return l.keyColumns
 }
 
 func (l LibGen) SortModeField() string {

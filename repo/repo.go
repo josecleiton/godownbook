@@ -41,10 +41,10 @@ type BookRow struct {
 	Columns  []string
 }
 
-func (b BookRow) Key(r Repository) (key string) {
+func (b BookRow) Key(r Repository, del byte) (key string) {
 	for i, idx := range r.KeyColumns() {
 		if i != 0 {
-			key += fmt.Sprintf("%c ", '|')
+			key += fmt.Sprintf("%c ", del)
 		}
 		key += strings.TrimSpace(b.Columns[idx]) + " "
 	}
