@@ -230,6 +230,8 @@ func eventLoop() {
 			switch e.ID {
 			case "q", "<C-c>":
 				return
+			case "d", "D":
+				return
 			case "j", "<Down>":
 				l.ScrollDown()
 			case "k", "<Up>":
@@ -261,10 +263,24 @@ func eventLoop() {
 				l.SetRect(0, 0, x, y)
 			}
 
-			if previousKey == "g" {
-				previousKey = ""
-			} else {
+			if num, err := strconv.Atoi(e.ID); (num > 0 || previousKey != "") && err == nil {
+				if num2, err := strconv.Atoi(previousKey); err == nil {
+					num = num2*10 + num
+				}
 				previousKey = e.ID
+				if num > 9 {
+					previousKey = ""
+					if num > 25 {
+						num = 25
+					}
+				}
+				l.SelectedRow = num - 1
+			} else {
+				if previousKey == "g" {
+					previousKey = ""
+				} else {
+					previousKey = e.ID
+				}
 			}
 			ui.Render(grid)
 		}
@@ -273,7 +289,7 @@ func eventLoop() {
 }
 
 func main() {
-	test()
+	// test()
 	repo := reposToSearch()
 	nodes, max := makeTreeData(repo)
 
