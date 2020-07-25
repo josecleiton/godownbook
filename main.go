@@ -120,13 +120,14 @@ func eventLoop(mainScreen *w.MainScreen, bc *BookController, done chan bool) {
 	wRender.Unlock()
 	for {
 		select {
+		case <-sigTerm:
+			return
 		case modal = <-bc.Display:
 			if modal != nil {
 				page = MODAL
 				lockAndRender(modal)
 			}
-		case <-sigTerm:
-			return
+		case <-mainScreen.SelectedRow:
 		case e := <-uiEvents:
 			l = mainScreen.BookList
 			// global key maps

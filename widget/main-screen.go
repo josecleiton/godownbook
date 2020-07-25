@@ -11,6 +11,7 @@ type MainScreen struct {
 	ui.Grid
 	BookList       *BookList
 	PageIndicator  *PageIndicator
+	StatusBar      *StatusBar
 	UpdateList     chan *BookList
 	UpdatePage     chan int
 	SelectedRow    chan int
@@ -18,15 +19,15 @@ type MainScreen struct {
 	DownloadedFile chan *os.File
 }
 
-func NewMainScreen(bl *BookList, pi *PageIndicator, tw, th int) *MainScreen {
+func NewMainScreen(sb *StatusBar, bl *BookList, pi *PageIndicator, tw, th int) *MainScreen {
 	ms := &MainScreen{
-		BookList: bl, PageIndicator: pi,
+		StatusBar: sb, BookList: bl, PageIndicator: pi,
 		UpdatePage: make(chan int), UpdateList: make(chan *BookList),
 		UpdateDown: make(chan float64), SelectedRow: make(chan int),
 		DownloadedFile: make(chan *os.File),
 	}
 	ms.Grid = *ui.NewGrid()
-	ms.Set(ui.NewRow(0.9, bl), ui.NewRow(0.1, pi))
+	ms.Set(ui.NewRow(0.1, sb), ui.NewRow(0.8, bl), ui.NewRow(0.1, pi))
 	ms.SetRect(0, 0, tw, th)
 	return ms
 }

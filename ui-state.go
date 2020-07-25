@@ -72,13 +72,17 @@ func fetchInitialData(r repo.Repository, load chan int) ([]*repo.BookRow, int) {
 	return br, max
 }
 
-func downloadBook(downloader repo.Downloader, b *book.Book, cfile chan *os.File, cprogress chan float64) {
+func downloadBook(
+	downloader repo.Downloader, b *book.Book,
+	cfile chan *os.File, cprogress chan float64,
+) {
 	mirror := downloader.Key()
 	dest := filepath.Join(config.UserConfig.OutDir, b.ToPath())
 	f, err := downloader.Exec(b.Mirrors[mirror], dest, cfile, cprogress)
 	if err != nil {
 		return
 	}
+	f.Close()
 	bibPath := filepath.Join(config.UserConfig.OutDirBib, b.ToPathBIB())
 	bibFile, err := os.Create(bibPath)
 	if err != nil {
@@ -102,7 +106,10 @@ func fetchData(r repo.Repository, load chan int, done chan bool) {
 	nodes := makeListData(r, br)
 	time.Sleep(50 * time.Millisecond)
 	tw, th := terminalDim()
-	mainScreen := w.NewMainScreen(w.NewBookList(nodes), w.NewPageIndicator(max, 1), tw, th)
+	mainScreen := w.NewMainScreen(
+		w.NewStatusBar(), w.NewBookList(nodes), w.NewPageIndicator(max, 1),
+		tw, th,
+	)
 	load <- LOAD_COMPLETED
 	iDone := make(chan bool)
 	bc := NewBookController()
@@ -123,6 +130,7 @@ func fetchData(r repo.Repository, load chan int, done chan bool) {
 			bc.Display <- w.NewBookModal(book, tw, th)
 		case mirror := <-bc.Download:
 			if downloader, err := r.DownloadBook(mirror); err == nil {
+				log.Println("TESTE2")
 				go downloadBook(downloader, book, mainScreen.DownloadedFile, mainScreen.UpdateDown)
 			}
 		case page := <-mainScreen.UpdatePage:
