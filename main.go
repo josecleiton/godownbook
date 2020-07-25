@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"sync"
 
 	// "syscall"
 
@@ -27,11 +28,9 @@ var verboseFlag bool
 var repository string
 var configPath string
 
-var uiClosed bool
-var bRows []*repo.BookRow
-var bookList *w.BookList
-var pageIndicator *w.PageIndicator
-var grid *ui.Grid
+var wRender = &sync.Mutex{}
+
+var cdownloading = make(chan bool)
 
 var supportedRepositories = map[string]repo.Repository{
 	"libgen": libgen.Make(),
@@ -57,6 +56,7 @@ func init() {
 		repository = config.UserConfig.DefaultRepo
 	}
 }
+
 func parseConfigFile(cdir string) {
 	exts := [2]string{config.JSON, config.YAML}
 	for _, ext := range exts {
@@ -123,7 +123,13 @@ func test() {
 	}
 }
 
-func screenResize() {
+func lockAndRender(items ...ui.Drawable) {
+	wRender.Lock()
+	ui.Render(items...)
+	wRender.Unlock()
+}
+
+func screenResize(grid *ui.Grid) {
 	tw, th := ui.TerminalDimensions()
 	grid.SetRect(0, 0, tw, th)
 }
@@ -155,109 +161,117 @@ func fetchInitialData(r repo.Repository) (content string, err error) {
 	return
 }
 
-func handleError(err error) {
-	if grid != nil {
-		ui.Close()
-		uiClosed = true
-	}
-	if err != nil {
-		log.Fatalln(err)
-	}
-}
+type PageType int
 
-func setupGrid() *ui.Grid {
-	grid := ui.NewGrid()
-	grid.Set(ui.NewRow(0.9, bookList), ui.NewRow(0.1, pageIndicator))
-	return grid
-}
-
-func eventLoop() {
+func eventLoop(mainScreen *w.MainScreen, controller *BookController, done chan bool) {
+	const (
+		LIST PageType = iota
+		MODAL
+	)
+	defer func() { done <- true }()
+	l := mainScreen.BookList
+	page := LIST
 	sigTerm := make(chan os.Signal)
 	signal.Notify(sigTerm, os.Interrupt)
 	signal.Notify(sigTerm, os.Kill)
 	previousKey := ""
+	wRender.Lock()
 	uiEvents := ui.PollEvents()
-	l := bookList
+	ui.Render(mainScreen)
+	wRender.Unlock()
 	for {
 		select {
+		case modal := <-controller.Display:
+			if modal != nil {
+				page = MODAL
+				lockAndRender(modal)
+			}
 		case <-sigTerm:
 			return
 		case e := <-uiEvents:
+			l = mainScreen.BookList
 			switch e.ID {
 			case "q", "<C-c>":
 				return
-			case "d", "D":
-				return
-			case "j", "<Down>":
-				l.ScrollDown()
-			case "k", "<Up>":
-				l.ScrollUp()
-			case "<C-d>":
-				l.ScrollHalfPageDown()
-			case "<C-u>":
-				l.ScrollHalfPageUp()
-			case "<C-f>":
-				l.ScrollPageDown()
-			case "<C-b>":
-				l.ScrollPageUp()
-			case "g":
-				if previousKey == "g" {
-					l.ScrollTop()
-				}
-			case "<Home>":
-				l.ScrollTop()
-			case "<Enter>":
-				break
-			case "G", "<End>":
-				l.ScrollBottom()
-			case "<Resize>":
-				screenResize()
 			}
-
-			if num, err := strconv.Atoi(e.ID); (num > 0 || previousKey != "") && err == nil {
-				if num2, err := strconv.Atoi(previousKey); err == nil {
-					num = num2*10 + num
+			if page == LIST {
+				switch e.ID {
+				case "d", "D":
+					return
+				case "j", "<Down>":
+					l.ScrollDown()
+				case "k", "<Up>":
+					l.ScrollUp()
+				case "<C-d>", "L":
+					l.ScrollHalfPageDown()
+				case "<C-u>", "H":
+					l.ScrollHalfPageUp()
+				case "<C-f>", "J":
+					l.ScrollPageDown()
+				case "<C-b>", "K":
+					l.ScrollPageUp()
+				case "g":
+					if previousKey == "g" {
+						l.ScrollTop()
+					}
+				case "<Home>":
+					l.ScrollTop()
+				case "<Enter>":
+					mainScreen.CPi <- l.SelectedRow
+				case "G", "<End>":
+					l.ScrollBottom()
+				case "<Resize>":
+					mainScreen.Resize()
 				}
-				previousKey = e.ID
-				if num > 9 {
-					previousKey = ""
-					if num > 25 {
-						num = 25
+				if num, err := strconv.Atoi(e.ID); (num > 0 || previousKey != "") && err == nil {
+					if num2, err := strconv.Atoi(previousKey); err == nil {
+						num = num2*10 + num
+					}
+					previousKey = e.ID
+					if num > 9 {
+						previousKey = ""
+						if num > 25 {
+							num = 25
+						}
+					}
+					l.SelectedRow = num - 1
+				} else {
+					if previousKey == "g" {
+						previousKey = ""
+					} else {
+						previousKey = e.ID
 					}
 				}
-				l.SelectedRow = num - 1
-			} else {
-				if previousKey == "g" {
-					previousKey = ""
-				} else {
-					previousKey = e.ID
-				}
+				lockAndRender(mainScreen)
 			}
-			ui.Render(grid)
 		}
 
 	}
 }
 
 func main() {
-	// test()
-	repo := reposToSearch()
-	nodes, max := makeListData(repo)
-
 	if err := ui.Init(); err != nil {
 		log.Fatalf("failed to initialize termui: %v", err)
 	}
+	defer ui.Close()
 	defer func() { util.PrintMemUsage() }()
-	defer func() {
-		if !uiClosed {
-			ui.Close()
+	r := reposToSearch()
+	loadProgress := make(chan int)
+	done := make(chan bool)
+	lw := w.NewLoading(loadProgress)
+	lw.SetRect(0, 0, 50, 5)
+	ui.Render(lw)
+	go func() {
+		for {
+			percent := <-loadProgress
+			lw.Percent = percent
+			lockAndRender(lw)
+			if lw.Percent >= 100 {
+				break
+			}
 		}
+		loadProgress <- 100
 	}()
-	bookList = w.NewBookList(nodes)
-	pageIndicator = w.NewPageIndicator(max)
-	grid = setupGrid()
-	screenResize()
-	ui.Render(grid)
-
-	eventLoop()
+	go fetchData(r, loadProgress, done)
+	<-done
 }

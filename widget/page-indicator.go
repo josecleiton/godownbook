@@ -14,8 +14,13 @@ type PageIndicator struct {
 	selected int
 }
 
-func NewPageIndicator(max int) *PageIndicator {
-	pi := &PageIndicator{Max: max}
+func NewPageIndicator(max int, selected int) *PageIndicator {
+	if selected <= 0 {
+		selected = 1
+	} else if selected > max {
+		selected = max
+	}
+	pi := &PageIndicator{Max: max, selected: selected}
 	pi.Table = *w.NewTable()
 	pages := make([]string, max)
 	for i := range pages {
