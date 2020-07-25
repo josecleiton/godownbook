@@ -70,8 +70,7 @@ Ext: %s
 func NewBookModal(b *book.Book, tw, th int) *BookModal {
 	bm := &BookModal{Data: b}
 	bm.Grid = *ui.NewGrid()
-	modalw, modalh := 2*tw/3, 2*th/3
-	bm.SetRect(tw/4, th/4, modalw, modalh)
+	bm.Resize(tw, th)
 	content := w.NewParagraph()
 	content.Text = newInfoTxt(b)
 	content.Title = b.Title
@@ -85,3 +84,9 @@ func NewBookModal(b *book.Book, tw, th int) *BookModal {
 	// bm.Set(ui.NewCol(0.33, img), ui.NewCol(0.77, content))
 	return bm
 }
+
+func (b *BookModal) Resize(tw, th int) {
+	modalw, modalh := 2*tw/3, 2*th/3
+	b.SetRect(tw/4, th/4, modalw, modalh)
+}
+

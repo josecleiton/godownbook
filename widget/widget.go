@@ -5,3 +5,7 @@ type BookNode struct {
 	Childs []string
 }
 
+type Resizable interface {
+	Resize(x, y int)
+}
+

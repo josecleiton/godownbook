@@ -17,7 +17,14 @@ import (
 
 type BookController struct {
 	Display  chan *w.BookModal
-	Download chan bool
+	Download chan int
+}
+
+func NewBookController() *BookController {
+	return &BookController{
+		Display:  make(chan *w.BookModal),
+		Download: make(chan int),
+	}
 }
 
 func handleError(err error) {
@@ -26,30 +33,8 @@ func handleError(err error) {
 	}
 }
 
-func buildRows(r repo.Repository) (rows [][]string, max int) {
-	rows = make([][]string, r.MaxPerPage()+1)
-	rows[0] = r.Columns()
-	c, err := fetchInitialData(r)
-	if err != nil {
-		log.Fatalln(err)
-	}
-	br, err := r.GetRows(c)
-	if err != nil {
-		log.Fatalln(err)
-	}
-	max, err = r.MaxPageNumber(c)
-	if err != nil {
-		log.Fatalln(err)
-	}
-	for i := 0; i < r.MaxPerPage(); i++ {
-		rows[i+1] = br[i].Columns
-	}
-
-	return
-}
-
-func makeListData(r repo.Repository, br []*repo.BookRow, n int) []w.BookNode {
-	nodes := make([]w.BookNode, n)
+func makeListData(r repo.Repository, br []*repo.BookRow) []w.BookNode {
+	nodes := make([]w.BookNode, len(br))
 	for i, row := range br {
 		nodes[i].Title = strconv.Itoa(i+1) + ". " + row.Key(r, config.UserConfig.Delimiter[0])
 		if i == 1 {
@@ -57,32 +42,6 @@ func makeListData(r repo.Repository, br []*repo.BookRow, n int) []w.BookNode {
 		}
 	}
 	return nodes
-}
-
-func makeTreeData(r repo.Repository) ([]w.BookNode, int) {
-	nodes := make([]w.BookNode, r.MaxPerPage())
-	c, err := fetchInitialData(r)
-	handleError(err)
-	br, err := r.GetRows(c)
-	handleError(err)
-	max, err := r.MaxPageNumber(c)
-	handleError(err)
-	keyColumns := r.KeyColumns()
-	keyBitmap := make(map[int]bool, len(keyColumns))
-	columns := r.Columns()
-	for _, idx := range keyColumns {
-		keyBitmap[idx] = true
-	}
-	for i, row := range br {
-		nodes[i].Title = strconv.Itoa(i+1) + ". " + row.Key(r, config.UserConfig.Delimiter[0])
-		nodes[i].Childs = make([]string, 0, len(row.Columns)-len(keyBitmap))
-		for j, col := range row.Columns {
-			if !keyBitmap[j] {
-				nodes[i].Childs = append(nodes[i].Childs, columns[j]+": "+col)
-			}
-		}
-	}
-	return nodes, max
 }
 
 func fetchBookRows(r repo.Repository, queryOpts *repo.QueryOptions, step repo.FetchStep) ([]*repo.BookRow, int) {
@@ -102,23 +61,24 @@ func terminalDim() (int, int) {
 	return tw, th
 }
 
-func fetchData(r repo.Repository, load chan int, done chan bool) {
-	defer func() { done <- true }()
+func fetchInitialData(r repo.Repository, load chan int) ([]*repo.BookRow, int) {
 	load <- 33
 	queryOpts := repo.NewQueryOptions(searchPattern)
 	br, max := fetchBookRows(r, queryOpts, repo.RowStep)
 	load <- 66
-	nodes := makeListData(r, br, max)
+	return br, max
+}
+
+func fetchData(r repo.Repository, load chan int, done chan bool) {
+	defer func() { done <- true }()
+	br, max := fetchInitialData(r, load)
+	nodes := makeListData(r, br)
 	time.Sleep(50 * time.Millisecond)
 	tw, th := terminalDim()
 	mainScreen := w.NewMainScreen(w.NewBookList(nodes), w.NewPageIndicator(max, 1), tw, th)
-	load <- 100
-	<-load
+	load <- LOAD_COMPLETED
 	iDone := make(chan bool)
-	bc := &BookController{
-		Display:  make(chan *w.BookModal),
-		Download: make(chan bool),
-	}
+	bc := NewBookController()
 	go eventLoop(mainScreen, bc, iDone)
 	var book *book.Book
 	var err error
@@ -126,7 +86,7 @@ func fetchData(r repo.Repository, load chan int, done chan bool) {
 		select {
 		case <-iDone:
 			return
-		case selectedRow := <-mainScreen.CPi:
+		case selectedRow := <-mainScreen.SelectedRow:
 			book, err = r.BookInfo(br[selectedRow])
 			if err != nil {
 				bc.Display <- nil
@@ -134,12 +94,12 @@ func fetchData(r repo.Repository, load chan int, done chan bool) {
 			}
 			tw, th := terminalDim()
 			bc.Display <- w.NewBookModal(book, tw, th)
-		case download := <-bc.Download:
-			if !download {
+		case mirrorIdx := <-bc.Download:
+			if mirrorIdx < 0 {
 				break
 			}
 			log.Println("LANÇOU")
-		case page := <-mainScreen.CBl:
+		case page := <-mainScreen.UpdatePage:
 			log.Println(page)
 		}
 	}

@@ -1,12 +1,9 @@
 package main
 
 import (
-	"errors"
 	"flag"
 	"log"
-	"net/url"
 	"os"
-	"os/exec"
 	"os/signal"
 	"path/filepath"
 	"strconv"
@@ -30,7 +27,9 @@ var configPath string
 
 var wRender = &sync.Mutex{}
 
-var cdownloading = make(chan bool)
+const (
+	LOAD_COMPLETED = 100
+)
 
 var supportedRepositories = map[string]repo.Repository{
 	"libgen": libgen.Make(),
@@ -69,63 +68,18 @@ func parseConfigFile(cdir string) {
 	}
 }
 
-func test() {
-	repo := reposToSearch()
-	c, _ := fetchInitialData(repo)
-	util.PrintMemUsage()
-	br, _ := repo.GetRows(c)
-	m, _ := repo.MaxPageNumber(c)
-	util.PrintMemUsage()
-	log.Println("page", m)
-	b, _ := repo.BookInfo(br[0])
-	util.PrintMemUsage()
-	log.Println(b)
-	util.PrintMemUsage()
-	log.Println(b.ToBIB())
-	cf := make(chan *os.File)
-	progress := make(chan float64)
-	dest := filepath.Join(config.UserConfig.OutDirBib, b.ToPath())
-	downloader, err := repo.DownloadBook("Libgen.lc")
-	if err != nil {
-		log.Fatalln(err)
-	}
-	util.PrintMemUsage()
-	go downloader.Exec(b.Mirrors["Libgen.lc"], dest, cf, progress)
-	for {
-		select {
-		case f := <-cf:
-			util.PrintMemUsage()
-			if f == nil {
-				log.Fatalln(errors.New("download fail"))
-			}
-			defer f.Close()
-			log.Println(f.Name())
-			log.Println("dowloaded", b.ToPath(), b.Title)
-			bib, err := os.Create(filepath.Join(config.UserConfig.OutDirBib, b.ToPathBIB()))
-			if err != nil {
-				log.Fatalln(err)
-			}
-			defer bib.Close()
-			if _, err = bib.WriteString(b.ToBIB()); err != nil {
-				log.Fatalln(err)
-			}
-			if userCmd := config.UserConfig.ExecCmd; userCmd != "" {
-				cmd := exec.Command(userCmd, f.Name(), bib.Name())
-				if err := cmd.Start(); err != nil {
-					log.Fatalln(err)
-				}
-			}
-			util.PrintMemUsage()
-			os.Exit(0)
-		case p := <-progress:
-			log.Println(p)
-		}
-	}
-}
-
 func lockAndRender(items ...ui.Drawable) {
 	wRender.Lock()
 	ui.Render(items...)
+	wRender.Unlock()
+}
+
+func handleResize(items ...w.Resizable) {
+	wRender.Lock()
+	tw, th := ui.TerminalDimensions()
+	for _, item := range items {
+		item.Resize(tw, th)
+	}
 	wRender.Unlock()
 }
 
@@ -145,30 +99,15 @@ func reposToSearch() repo.Repository {
 	return supportedRepositories[repository]
 }
 
-func fetchInitialData(r repo.Repository) (content string, err error) {
-	u := r.BaseURL()
-	log.Println("baseUrl", u)
-	params := &url.Values{}
-	repo.Query(r, params, searchPattern)
-	repo.QueryExtraFields(r, params)
-	log.Println("params", params)
-	u.RawQuery = params.Encode()
-	log.Println("url", u)
-	content, code, err := repo.FetchContent(r, &u, repo.RowStep)
-	if code != 200 {
-		err = errors.New("fetch initial data status code != 200")
-	}
-	return
-}
-
 type PageType int
 
-func eventLoop(mainScreen *w.MainScreen, controller *BookController, done chan bool) {
+func eventLoop(mainScreen *w.MainScreen, bc *BookController, done chan bool) {
 	const (
 		LIST PageType = iota
 		MODAL
 	)
 	defer func() { done <- true }()
+	var modal *w.BookModal
 	l := mainScreen.BookList
 	page := LIST
 	sigTerm := make(chan os.Signal)
@@ -181,7 +120,7 @@ func eventLoop(mainScreen *w.MainScreen, controller *BookController, done chan b
 	wRender.Unlock()
 	for {
 		select {
-		case modal := <-controller.Display:
+		case modal = <-bc.Display:
 			if modal != nil {
 				page = MODAL
 				lockAndRender(modal)
@@ -190,6 +129,7 @@ func eventLoop(mainScreen *w.MainScreen, controller *BookController, done chan b
 			return
 		case e := <-uiEvents:
 			l = mainScreen.BookList
+			// global key maps
 			switch e.ID {
 			case "q", "<C-c>":
 				return
@@ -217,11 +157,11 @@ func eventLoop(mainScreen *w.MainScreen, controller *BookController, done chan b
 				case "<Home>":
 					l.ScrollTop()
 				case "<Enter>":
-					mainScreen.CPi <- l.SelectedRow
+					mainScreen.SelectedRow <- l.SelectedRow
 				case "G", "<End>":
 					l.ScrollBottom()
 				case "<Resize>":
-					mainScreen.Resize()
+					handleResize(mainScreen)
 				}
 				if num, err := strconv.Atoi(e.ID); (num > 0 || previousKey != "") && err == nil {
 					if num2, err := strconv.Atoi(previousKey); err == nil {
@@ -243,9 +183,31 @@ func eventLoop(mainScreen *w.MainScreen, controller *BookController, done chan b
 					}
 				}
 				lockAndRender(mainScreen)
+			} else { // page != MAIN
+				switch e.ID {
+				case "d", "D", "<Enter>", "<Space>":
+					bc.Download <- 0
+				case "<Escape>", "c", "C":
+					page = LIST
+					lockAndRender(mainScreen)
+				case "<Resize>":
+					handleResize(modal)
+					lockAndRender(modal)
+				}
 			}
 		}
 
+	}
+}
+
+func updatePercentage(lw *w.Loading, cstat chan int) {
+	for {
+		percent := <-cstat
+		lw.Percent = percent
+		lockAndRender(lw)
+		if lw.Percent == LOAD_COMPLETED {
+			return
+		}
 	}
 }
 
@@ -253,25 +215,15 @@ func main() {
 	if err := ui.Init(); err != nil {
 		log.Fatalf("failed to initialize termui: %v", err)
 	}
-	defer ui.Close()
 	defer func() { util.PrintMemUsage() }()
+	defer ui.Close()
 	r := reposToSearch()
-	loadProgress := make(chan int)
-	done := make(chan bool)
-	lw := w.NewLoading(loadProgress)
+	lw := w.NewLoading()
 	lw.SetRect(0, 0, 50, 5)
 	ui.Render(lw)
-	go func() {
-		for {
-			percent := <-loadProgress
-			lw.Percent = percent
-			lockAndRender(lw)
-			if lw.Percent >= 100 {
-				break
-			}
-		}
-		loadProgress <- 100
-	}()
+	loadProgress := make(chan int)
+	done := make(chan bool)
+	go updatePercentage(lw, loadProgress)
 	go fetchData(r, loadProgress, done)
 	<-done
 }

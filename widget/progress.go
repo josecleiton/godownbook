@@ -10,7 +10,7 @@ type Loading struct {
 	w.Gauge
 }
 
-func NewLoading(cpercent chan int) *Loading {
+func NewLoading() *Loading {
 	lw := &Loading{}
 	lw.Gauge = *w.NewGauge()
 	lw.Title = "Loading"
