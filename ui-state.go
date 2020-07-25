@@ -3,6 +3,9 @@ package main
 import (
 	"fmt"
 	"log"
+	"os"
+	"os/exec"
+	"path/filepath"
 	"strconv"
 	"time"
 
@@ -17,13 +20,13 @@ import (
 
 type BookController struct {
 	Display  chan *w.BookModal
-	Download chan int
+	Download chan string
 }
 
 func NewBookController() *BookController {
 	return &BookController{
 		Display:  make(chan *w.BookModal),
-		Download: make(chan int),
+		Download: make(chan string),
 	}
 }
 
@@ -69,6 +72,30 @@ func fetchInitialData(r repo.Repository, load chan int) ([]*repo.BookRow, int) {
 	return br, max
 }
 
+func downloadBook(downloader repo.Downloader, b *book.Book, cfile chan *os.File, cprogress chan float64) {
+	mirror := downloader.Key()
+	dest := filepath.Join(config.UserConfig.OutDir, b.ToPath())
+	f, err := downloader.Exec(b.Mirrors[mirror], dest, cfile, cprogress)
+	if err != nil {
+		return
+	}
+	bibPath := filepath.Join(config.UserConfig.OutDirBib, b.ToPathBIB())
+	bibFile, err := os.Create(bibPath)
+	if err != nil {
+		return
+	}
+	defer bibFile.Close()
+	if _, err = bibFile.WriteString(b.ToBIB()); err != nil {
+		return
+	}
+	if userCmd := config.UserConfig.ExecCmd; userCmd != "" {
+		cmd := exec.Command(userCmd, f.Name(), bibFile.Name())
+		if err := cmd.Start(); err != nil {
+			log.Fatalln(err)
+		}
+	}
+}
+
 func fetchData(r repo.Repository, load chan int, done chan bool) {
 	defer func() { done <- true }()
 	br, max := fetchInitialData(r, load)
@@ -94,11 +121,10 @@ func fetchData(r repo.Repository, load chan int, done chan bool) {
 			}
 			tw, th := terminalDim()
 			bc.Display <- w.NewBookModal(book, tw, th)
-		case mirrorIdx := <-bc.Download:
-			if mirrorIdx < 0 {
-				break
+		case mirror := <-bc.Download:
+			if downloader, err := r.DownloadBook(mirror); err == nil {
+				go downloadBook(downloader, book, mainScreen.DownloadedFile, mainScreen.UpdateDown)
 			}
-			log.Println("LANÇOU")
 		case page := <-mainScreen.UpdatePage:
 			log.Println(page)
 		}

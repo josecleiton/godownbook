@@ -51,6 +51,7 @@ type LibGen struct {
 }
 
 type Downloader struct {
+	Name string
 }
 
 func Make() LibGen {
@@ -136,36 +137,41 @@ func (LibGen) MaxPerPage() int {
 func (LibGen) DownloadBook(mirror string) (downloader repo.Downloader, err error) {
 	switch mirror {
 	case "Gen.lib.rus.ec", "Libgen.lc":
-		downloader = Downloader{}
+		downloader = Downloader{Name: mirror}
 	default:
 		err = errors.New(fmt.Sprintf("libgen: not supported mirror - %v\n", mirror))
 	}
 	return
 }
 
-func (Downloader) Exec(u *url.URL, dest string, file chan *os.File, progress chan float64) {
+func (d Downloader) Key() string {
+	return d.Name
+}
+
+func (Downloader) Exec(u *url.URL, dest string, file chan *os.File, progress chan float64) (*os.File, error) {
 	resp, err := util.Fetch(u, http.MethodGet, nil)
 	if err != nil {
 		file <- nil
-		return
+		return nil, err
 	}
 	defer resp.Body.Close()
 	body, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
 		file <- nil
-		return
+		return nil, err
 	}
 	link, err := urlFromGETText(string(body))
 	if err != nil {
 		file <- nil
-		return
+		return nil, err
 	}
 	f, err := downBookFile(link, dest, progress)
 	if err != nil {
 		file <- nil
-		return
+		return nil, err
 	}
 	file <- f
+	return f, nil
 }
 
 func bodyCrawler(node *html.Node) (*html.Node, error) {

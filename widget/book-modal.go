@@ -39,34 +39,6 @@ Ext: %s
 		b.Size, b.Extension, b.Synopsis)
 }
 
-// func newInfoGrid(b *book.Book) *ui.Grid {
-// 	info := ui.NewGrid()
-// 	info.Border = false
-// 	author := newParagraph()
-// 	author.Text = "Author: " + b.Author
-// 	title := newParagraph()
-// 	title.Text = "Title: " + b.Title
-// 	publisher := newParagraph()
-// 	publisher.Text = "Publisher: " + b.Publisher
-// 	year := newParagraph()
-// 	year.Title = "Year: " + b.Year
-// 	pages := newParagraph()
-// 	pages.Title = "Pages: " + b.Pages
-// 	lang := newParagraph()
-// 	lang.Title = "Lang: " + b.Language
-// 	size := newParagraph()
-// 	size.Title = "Filesize: " + b.Size
-// 	ext := newParagraph()
-// 	ext.Title = "Ext: " + b.Extension
-// 	const ratio = 8 / 10.0
-// 	info.Set(
-// 		ui.NewRow(ratio, author), ui.NewRow(ratio, title), ui.NewRow(ratio, publisher),
-// 		ui.NewRow(ratio, year), ui.NewRow(ratio, pages), ui.NewRow(ratio, lang),
-// 		ui.NewRow(ratio, size), ui.NewRow(ratio, ext),
-// 	)
-// 	return info
-// }
-
 func NewBookModal(b *book.Book, tw, th int) *BookModal {
 	bm := &BookModal{Data: b}
 	bm.Grid = *ui.NewGrid()
@@ -78,7 +50,7 @@ func NewBookModal(b *book.Book, tw, th int) *BookModal {
 	bar.Text = "Press 'd' to download or 'ESC' to exit"
 	// img := w.NewImage(*b.Cover)
 	// img.SetRect(0, 0, modalw, modalh)
-	bm.Set(ui.NewRow(0.8, content), ui.NewRow(0.2, bar))
+	bm.Set(ui.NewRow(0.75, content), ui.NewRow(0.25, bar))
 	// content := newContent(b)
 	// content.SetRect(modalw/10, modalh/10, 2*modalw/3, modalh)
 	// bm.Set(ui.NewCol(0.33, img), ui.NewCol(0.77, content))

@@ -29,7 +29,8 @@ const (
 )
 
 type Downloader interface {
-	Exec(u *url.URL, dest string, file chan *os.File, progress chan float64)
+	Key() string
+	Exec(u *url.URL, dest string, file chan *os.File, progress chan float64) (*os.File, error)
 }
 
 // ContentError generic error on parsing content

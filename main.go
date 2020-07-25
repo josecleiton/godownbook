@@ -186,7 +186,7 @@ func eventLoop(mainScreen *w.MainScreen, bc *BookController, done chan bool) {
 			} else { // page != MAIN
 				switch e.ID {
 				case "d", "D", "<Enter>", "<Space>":
-					bc.Download <- 0
+					bc.Download <- "Libgen.lc"
 				case "<Escape>", "c", "C":
 					page = LIST
 					lockAndRender(mainScreen)
@@ -219,7 +219,14 @@ func main() {
 	defer ui.Close()
 	r := reposToSearch()
 	lw := w.NewLoading()
-	lw.SetRect(0, 0, 50, 5)
+	tw, th := ui.TerminalDimensions()
+	if tw > 50 {
+		tw = 50
+	}
+	if th > 5 {
+		th = 5
+	}
+	lw.SetRect(0, 0, tw, th)
 	ui.Render(lw)
 	loadProgress := make(chan int)
 	done := make(chan bool)
