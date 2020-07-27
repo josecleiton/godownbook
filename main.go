@@ -10,14 +10,13 @@ import (
 	"strings"
 	"sync"
 
-	// "syscall"
-
 	ui "github.com/gizak/termui/v3"
 	"github.com/josecleiton/godownbook/config"
 	"github.com/josecleiton/godownbook/repo"
 	"github.com/josecleiton/godownbook/repo/libgen"
 	"github.com/josecleiton/godownbook/util"
 	w "github.com/josecleiton/godownbook/widget"
+	tb "github.com/nsf/termbox-go"
 )
 
 var searchPattern string
@@ -127,6 +126,12 @@ func eventLoop(mainScreen *w.MainScreen, bc *BookController, done chan bool) {
 				page = MODAL
 				lockAndRender(modal)
 			}
+		case percentage := <-mainScreen.UpdateDown:
+			mainScreen.StatusBar.OnProgress(percentage)
+			lockAndRender(mainScreen)
+		case <-mainScreen.DownloadedFile:
+			mainScreen.StatusBar.OnFinished()
+			lockAndRender(mainScreen)
 		case <-mainScreen.SelectedRow:
 		case e := <-uiEvents:
 			l = mainScreen.BookList
@@ -186,8 +191,9 @@ func eventLoop(mainScreen *w.MainScreen, bc *BookController, done chan bool) {
 				lockAndRender(mainScreen)
 			} else { // page != MAIN
 				switch e.ID {
-				case "d", "D", "<Enter>", "<Space>":
+				case "d", "<Enter>", "<Space>":
 					bc.Download <- "Libgen.lc"
+					fallthrough
 				case "<Escape>", "c", "C":
 					page = LIST
 					lockAndRender(mainScreen)
@@ -199,6 +205,19 @@ func eventLoop(mainScreen *w.MainScreen, bc *BookController, done chan bool) {
 		}
 
 	}
+}
+
+func loadingWidget() *w.Loading {
+	lw := w.NewLoading()
+	tw, th := ui.TerminalDimensions()
+	if tw > 50 {
+		tw = 50
+	}
+	if th > 5 {
+		th = 5
+	}
+	lw.SetRect(0, 0, tw, th)
+	return lw
 }
 
 func updatePercentage(lw *w.Loading, cstat chan int) {
@@ -216,18 +235,11 @@ func main() {
 	if err := ui.Init(); err != nil {
 		log.Fatalf("failed to initialize termui: %v", err)
 	}
+	tb.SetInputMode(tb.InputEsc) // Disable mouse input
 	defer func() { util.PrintMemUsage() }()
 	defer ui.Close()
 	r := reposToSearch()
-	lw := w.NewLoading()
-	tw, th := ui.TerminalDimensions()
-	if tw > 50 {
-		tw = 50
-	}
-	if th > 5 {
-		th = 5
-	}
-	lw.SetRect(0, 0, tw, th)
+	lw := loadingWidget()
 	ui.Render(lw)
 	loadProgress := make(chan int)
 	done := make(chan bool)

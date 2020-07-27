@@ -27,13 +27,13 @@ func NewMainScreen(sb *StatusBar, bl *BookList, pi *PageIndicator, tw, th int) *
 		DownloadedFile: make(chan *os.File),
 	}
 	ms.Grid = *ui.NewGrid()
-	ms.Set(ui.NewRow(0.1, sb), ui.NewRow(0.8, bl), ui.NewRow(0.1, pi))
-	ms.SetRect(0, 0, tw, th)
+	ms.Update()
+	ms.Resize(tw, th)
 	return ms
 }
 
 func (ms *MainScreen) Update() {
-	ms.Set(ui.NewRow(0.9, ms.BookList), ui.NewRow(0.1, ms.PageIndicator))
+	ms.Set(ui.NewRow(0.1, ms.StatusBar), ui.NewRow(0.8, ms.BookList), ui.NewRow(0.1, ms.PageIndicator))
 }
 
 func (ms *MainScreen) Resize(tw, th int) {

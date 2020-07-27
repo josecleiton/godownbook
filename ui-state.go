@@ -131,6 +131,7 @@ func fetchData(r repo.Repository, load chan int, done chan bool) {
 		case mirror := <-bc.Download:
 			if downloader, err := r.DownloadBook(mirror); err == nil {
 				log.Println("TESTE2")
+				mainScreen.StatusBar.OnDownload()
 				go downloadBook(downloader, book, mainScreen.DownloadedFile, mainScreen.UpdateDown)
 			}
 		case page := <-mainScreen.UpdatePage:
