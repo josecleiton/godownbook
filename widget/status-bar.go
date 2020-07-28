@@ -11,23 +11,29 @@ type StatusBar struct {
 	ui.Grid
 	download      *w.Paragraph
 	title         *w.Paragraph
+	msg           *w.Paragraph
 	downCount     int
 	finishedCount int
 	progress      int
 }
 
 func NewStatusBar() *StatusBar {
-	s := &StatusBar{title: w.NewParagraph(), download: w.NewParagraph()}
+	s := &StatusBar{
+		title:    w.NewParagraph(),
+		msg:      w.NewParagraph(),
+		download: w.NewParagraph(),
+	}
 	s.Grid = *ui.NewGrid()
-	s.title.Border = false
 	s.title.Text = "godownbook"
+	s.title.Border = false
 	s.download.Border = false
+	s.msg.Border = false
 	s.Update()
 	return s
 }
 
 func (s *StatusBar) Update() {
-	s.Set(ui.NewCol(0.8, s.title), ui.NewCol(0.2, s.download))
+	s.Set(ui.NewCol(0.2, s.title), ui.NewCol(0.6, s.msg), ui.NewCol(0.2, s.download))
 }
 
 func (s *StatusBar) OnDownload() int {
@@ -44,6 +50,12 @@ func (s *StatusBar) OnError() int {
 	s.updateDownText()
 	s.Unlock()
 	return s.downCount
+}
+
+func (s *StatusBar) OnMessage(msg string) {
+	s.Lock()
+	s.msg.Text = msg
+	s.Unlock()
 }
 
 func (s *StatusBar) OnFinished() int {

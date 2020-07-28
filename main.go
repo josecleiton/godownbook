@@ -9,6 +9,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"time"
 
 	ui "github.com/gizak/termui/v3"
 	"github.com/josecleiton/godownbook/config"
@@ -129,9 +130,13 @@ func eventLoop(mainScreen *w.MainScreen, bc *BookController, done chan bool) {
 		case percentage := <-mainScreen.UpdateDown:
 			mainScreen.StatusBar.OnProgress(percentage)
 			lockAndRender(mainScreen)
-		case <-mainScreen.DownloadedFile:
+		case f := <-mainScreen.DownloadedFile:
+			f.Close()
+			mainScreen.StatusBar.OnMessage("Downloaded: " + f.Name())
 			mainScreen.StatusBar.OnFinished()
 			lockAndRender(mainScreen)
+			time.Sleep(5 * time.Second)
+			mainScreen.StatusBar.OnMessage("")
 		case <-mainScreen.SelectedRow:
 		case e := <-uiEvents:
 			l = mainScreen.BookList
