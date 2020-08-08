@@ -11,6 +11,7 @@ import (
 type PageIndicator struct {
 	w.TabPane
 	Selected    int
+	max         int
 	highlighted bool
 }
 
@@ -19,9 +20,21 @@ func NewPageIndicator(max int) *PageIndicator {
 	for i := range pages {
 		pages[i] = strconv.Itoa(i + 1)
 	}
-	pi := &PageIndicator{TabPane: *w.NewTabPane(pages...)}
+	pi := &PageIndicator{TabPane: *w.NewTabPane(pages...), max: max}
 	pi.Border = true
 	return pi
+}
+
+func (pi *PageIndicator) FocusStart() {
+	pi.ActiveTabIndex = 0
+}
+
+func (pi *PageIndicator) FocusEnd() {
+	pi.ActiveTabIndex = pi.max - 1
+}
+
+func (pi *PageIndicator) FocusMiddle() {
+	pi.ActiveTabIndex = pi.max / 2
 }
 
 func (pi *PageIndicator) ToggleHighlight() {

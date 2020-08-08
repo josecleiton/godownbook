@@ -224,13 +224,30 @@ func eventLoop(mainScreen *w.MainScreen, bc *BookController, done chan bool) {
 					if pi.Selected != pi.ActiveTabIndex {
 						pi.ActiveTabIndex = pi.Selected
 					}
-				case "h":
+				case "h", "<Left>":
 					pi.FocusLeft()
-				case "l":
+				case "l", "<Right>":
 					pi.FocusRight()
+				case "g":
+					if previousKey == "g" {
+						pi.FocusStart()
+					}
+				case "H", "<Home>":
+					pi.FocusStart()
+				case "m", "M", "<C-m>":
+					pi.FocusMiddle()
+				case "L", "G", "<End>":
+					pi.FocusEnd()
 				case "<Enter>":
 					pi.Selected = pi.ActiveTabIndex
 					// load page
+				case "<Resize>":
+					handleResize(mainScreen)
+				}
+				if previousKey == "g" {
+					previousKey = ""
+				} else {
+					previousKey = e.ID
 				}
 				lockAndRender(mainScreen)
 			}
