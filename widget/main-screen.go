@@ -20,6 +20,7 @@ type MainScreen struct {
 }
 
 func NewMainScreen(sb *StatusBar, bl *BookList, pi *PageIndicator, tw, th int) *MainScreen {
+	bl.ToggleHighlight()
 	ms := &MainScreen{
 		StatusBar: sb, BookList: bl, PageIndicator: pi,
 		UpdatePage: make(chan int), UpdateList: make(chan *BookList),

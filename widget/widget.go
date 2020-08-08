@@ -9,3 +9,6 @@ type Resizable interface {
 	Resize(x, y int)
 }
 
+type Highlightable interface {
+	ToggleHighlight()
+}

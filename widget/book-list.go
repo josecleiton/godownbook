@@ -7,7 +7,7 @@ import (
 
 type BookList struct {
 	w.List
-	i int
+	highlighted bool
 }
 
 func NewBookList(nodes []BookNode) *BookList {
@@ -18,8 +18,21 @@ func NewBookList(nodes []BookNode) *BookList {
 		rows[i] = node.Title
 	}
 	l.TextStyle = ui.NewStyle(ui.ColorGreen)
-	l.Border = false
+	l.Border = true
 	l.WrapText = false
 	l.Rows = rows
 	return l
+}
+
+func (l *BookList) ToggleHighlight() {
+	l.highlighted = !l.highlighted
+	l.drawHighlight()
+}
+
+func (l *BookList) drawHighlight() {
+	if l.highlighted {
+		l.BorderStyle = ui.NewStyle(ui.ColorBlue)
+	} else {
+		l.BorderStyle = ui.Theme.Block.Border
+	}
 }

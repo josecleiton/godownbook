@@ -82,6 +82,12 @@ func handleResize(items ...w.Resizable) {
 	wRender.Unlock()
 }
 
+func toggleHighlight(items ...w.Highlightable) {
+	for _, item := range items {
+		item.ToggleHighlight()
+	}
+}
+
 func screenResize(grid *ui.Grid) {
 	tw, th := ui.TerminalDimensions()
 	grid.SetRect(0, 0, tw, th)
@@ -174,7 +180,7 @@ func eventLoop(mainScreen *w.MainScreen, bc *BookController, done chan bool) {
 				case "<Resize>":
 					handleResize(mainScreen)
 				case "<Tab>", "p", "P":
-					mainScreen.PageIndicator.ToggleHighlight()
+					toggleHighlight(mainScreen.PageIndicator, mainScreen.BookList)
 					highlighted = PAGES
 				}
 				if num, err := strconv.Atoi(e.ID); (num > 0 || previousKey != "") && err == nil {
@@ -213,7 +219,7 @@ func eventLoop(mainScreen *w.MainScreen, bc *BookController, done chan bool) {
 				pi := mainScreen.PageIndicator
 				switch e.ID {
 				case "<Tab>", "b", "B":
-					pi.ToggleHighlight()
+					toggleHighlight(pi, mainScreen.BookList)
 					highlighted = LIST
 					if pi.Selected != pi.ActiveTabIndex {
 						pi.ActiveTabIndex = pi.Selected
@@ -224,6 +230,7 @@ func eventLoop(mainScreen *w.MainScreen, bc *BookController, done chan bool) {
 					pi.FocusRight()
 				case "<Enter>":
 					pi.Selected = pi.ActiveTabIndex
+					// load page
 				}
 				lockAndRender(mainScreen)
 			}
@@ -260,7 +267,7 @@ func main() {
 	if err := ui.Init(); err != nil {
 		log.Fatalf("failed to initialize termui: %v", err)
 	}
-	tb.SetInputMode(tb.InputEsc) // Disable mouse input
+	tb.SetInputMode(tb.InputEsc) // disable mouse input
 	defer func() { util.PrintMemUsage() }()
 	defer ui.Close()
 	r := reposToSearch()
