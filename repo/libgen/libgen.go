@@ -82,6 +82,10 @@ func Make() LibGen {
 	}
 }
 
+func (LibGen) Key() string {
+	return "libgen"
+}
+
 func (l LibGen) HttpMethod(step repo.FetchStep) string {
 	return l.httpMethods[step]
 }

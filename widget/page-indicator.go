@@ -1,7 +1,7 @@
 package widget
 
 import (
-	"errors"
+	// "errors"
 	"strconv"
 
 	ui "github.com/gizak/termui/v3"
@@ -9,38 +9,42 @@ import (
 )
 
 type PageIndicator struct {
-	w.Table
-	Max      int
-	selected int
+	w.TabPane
+	Selected    int
+	highlighted bool
 }
 
-func NewPageIndicator(max int, selected int) *PageIndicator {
-	if selected <= 0 {
-		selected = 1
-	} else if selected > max {
-		selected = max
-	}
-	pi := &PageIndicator{Max: max, selected: selected}
-	pi.Table = *w.NewTable()
+func NewPageIndicator(max int) *PageIndicator {
 	pages := make([]string, max)
 	for i := range pages {
 		pages[i] = strconv.Itoa(i + 1)
 	}
-	pi.Rows = [][]string{pages}
-	pi.RowSeparator = false
-	pi.TextAlignment = ui.AlignCenter
-	pi.Border = false
+	pi := &PageIndicator{TabPane: *w.NewTabPane(pages...)}
+	pi.Border = true
 	return pi
 }
 
-func (p *PageIndicator) SelectPage(page int) error {
-	if page > p.Max {
-		return errors.New("page selected is out of bound")
-	}
-	p.selected = page
-	return nil
+func (pi *PageIndicator) ToggleHighlight() {
+	pi.highlighted = !pi.highlighted
+	pi.drawHighlight()
 }
 
-func (p *PageIndicator) SelectedPage() int {
-	return p.selected
+func (pi *PageIndicator) drawHighlight() {
+	if pi.highlighted {
+		pi.BorderStyle = ui.NewStyle(ui.ColorGreen)
+	} else {
+		pi.BorderStyle = ui.Theme.Block.Border
+	}
 }
+
+// func (p *PageIndicator) SelectPage(page int) error {
+// 	if page > p.Max {
+// 		return errors.New("page selected is out of bound")
+// 	}
+// 	p.selected = page
+// 	return nil
+// }
+
+// func (p *PageIndicator) SelectedPage() int {
+// 	return p.selected
+// }

@@ -9,7 +9,6 @@ import (
 	"strconv"
 	"strings"
 	"sync"
-	"time"
 
 	ui "github.com/gizak/termui/v3"
 	"github.com/josecleiton/godownbook/config"
@@ -101,15 +100,17 @@ func reposToSearch() repo.Repository {
 
 type PageType int
 
+// TODO: split this func in other funcs
 func eventLoop(mainScreen *w.MainScreen, bc *BookController, done chan bool) {
 	const (
 		LIST PageType = iota
 		MODAL
+		PAGES
 	)
 	defer func() { done <- true }()
 	var modal *w.BookModal
 	l := mainScreen.BookList
-	page := LIST
+	highlighted := LIST
 	sigTerm := make(chan os.Signal)
 	signal.Notify(sigTerm, os.Interrupt)
 	signal.Notify(sigTerm, os.Kill)
@@ -124,7 +125,7 @@ func eventLoop(mainScreen *w.MainScreen, bc *BookController, done chan bool) {
 			return
 		case modal = <-bc.Display:
 			if modal != nil {
-				page = MODAL
+				highlighted = MODAL
 				lockAndRender(modal)
 			}
 		case percentage := <-mainScreen.UpdateDown:
@@ -132,10 +133,9 @@ func eventLoop(mainScreen *w.MainScreen, bc *BookController, done chan bool) {
 			lockAndRender(mainScreen)
 		case f := <-mainScreen.DownloadedFile:
 			f.Close()
-			mainScreen.StatusBar.OnMessage("Downloaded: " + f.Name())
+			mainScreen.StatusBar.OnMessage(filepath.Base(f.Name()) + " downloaded")
 			mainScreen.StatusBar.OnFinished()
 			lockAndRender(mainScreen)
-			time.Sleep(5 * time.Second)
 			mainScreen.StatusBar.OnMessage("")
 		case <-mainScreen.SelectedRow:
 		case e := <-uiEvents:
@@ -145,7 +145,7 @@ func eventLoop(mainScreen *w.MainScreen, bc *BookController, done chan bool) {
 			case "q", "<C-c>":
 				return
 			}
-			if page == LIST {
+			if highlighted == LIST {
 				switch e.ID {
 				case "d", "D":
 					return
@@ -173,6 +173,9 @@ func eventLoop(mainScreen *w.MainScreen, bc *BookController, done chan bool) {
 					l.ScrollBottom()
 				case "<Resize>":
 					handleResize(mainScreen)
+				case "<Tab>", "p", "P":
+					mainScreen.PageIndicator.ToggleHighlight()
+					highlighted = PAGES
 				}
 				if num, err := strconv.Atoi(e.ID); (num > 0 || previousKey != "") && err == nil {
 					if num2, err := strconv.Atoi(previousKey); err == nil {
@@ -194,18 +197,35 @@ func eventLoop(mainScreen *w.MainScreen, bc *BookController, done chan bool) {
 					}
 				}
 				lockAndRender(mainScreen)
-			} else { // page != MAIN
+			} else if highlighted == MODAL {
 				switch e.ID {
 				case "d", "<Enter>", "<Space>":
 					bc.Download <- "Libgen.lc"
 					fallthrough
 				case "<Escape>", "c", "C":
-					page = LIST
+					highlighted = LIST
 					lockAndRender(mainScreen)
 				case "<Resize>":
 					handleResize(modal)
 					lockAndRender(modal)
 				}
+			} else { //highlighted ==PAGES
+				pi := mainScreen.PageIndicator
+				switch e.ID {
+				case "<Tab>", "b", "B":
+					pi.ToggleHighlight()
+					highlighted = LIST
+					if pi.Selected != pi.ActiveTabIndex {
+						pi.ActiveTabIndex = pi.Selected
+					}
+				case "h":
+					pi.FocusLeft()
+				case "l":
+					pi.FocusRight()
+				case "<Enter>":
+					pi.Selected = pi.ActiveTabIndex
+				}
+				lockAndRender(mainScreen)
 			}
 		}
 

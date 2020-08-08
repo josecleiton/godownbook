@@ -54,6 +54,8 @@ func (b BookRow) Key(r Repository, del byte) (key string) {
 
 // Repository represents a book repository
 type Repository interface {
+	// Key is a string that is unique between repos
+	Key() string
 	// HttpMethod returns the http method to fetch content
 	HttpMethod(step FetchStep) string
 	// SearchUrl returns the base url of repository

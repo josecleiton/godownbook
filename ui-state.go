@@ -103,11 +103,14 @@ func downloadBook(
 func fetchData(r repo.Repository, load chan int, done chan bool) {
 	defer func() { done <- true }()
 	br, max := fetchInitialData(r, load)
+	page := 1
+	cache := make(map[int][]*repo.BookRow, max)
+	cache[page] = br
 	nodes := makeListData(r, br)
 	time.Sleep(50 * time.Millisecond)
 	tw, th := terminalDim()
 	mainScreen := w.NewMainScreen(
-		w.NewStatusBar(), w.NewBookList(nodes), w.NewPageIndicator(max, 1),
+		w.NewStatusBar(), w.NewBookList(nodes), w.NewPageIndicator(max),
 		tw, th,
 	)
 	load <- LOAD_COMPLETED
@@ -115,13 +118,12 @@ func fetchData(r repo.Repository, load chan int, done chan bool) {
 	bc := NewBookController()
 	go eventLoop(mainScreen, bc, iDone)
 	var book *book.Book
-	var err error
 	for {
 		select {
 		case <-iDone:
 			return
 		case selectedRow := <-mainScreen.SelectedRow:
-			book, err = r.BookInfo(br[selectedRow])
+			book, err := r.BookInfo(br[selectedRow])
 			if err != nil {
 				bc.Display <- nil
 				break
@@ -134,7 +136,9 @@ func fetchData(r repo.Repository, load chan int, done chan bool) {
 				mainScreen.StatusBar.OnDownload()
 				go downloadBook(downloader, book, mainScreen.DownloadedFile, mainScreen.UpdateDown)
 			}
-		case page := <-mainScreen.UpdatePage:
+		case page = <-mainScreen.UpdatePage:
+			if cache[page] != nil {
+			}
 			log.Println(page)
 		}
 	}
