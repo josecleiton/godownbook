@@ -7,11 +7,12 @@ import (
 
 type BookList struct {
 	w.List
+	max         int
 	highlighted bool
 }
 
 func NewBookList(nodes []BookNode) *BookList {
-	l := &BookList{}
+	l := &BookList{max: len(nodes)}
 	l.List = *w.NewList()
 	rows := make([]string, len(nodes))
 	for i, node := range nodes {
@@ -22,6 +23,10 @@ func NewBookList(nodes []BookNode) *BookList {
 	l.WrapText = false
 	l.Rows = rows
 	return l
+}
+
+func (l *BookList) ScrollMiddle() {
+	l.SelectedRow = l.max / 2
 }
 
 func (l *BookList) ToggleHighlight() {

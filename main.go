@@ -159,6 +159,8 @@ func eventLoop(mainScreen *w.MainScreen, bc *BookController, done chan bool) {
 					l.ScrollDown()
 				case "k", "<Up>":
 					l.ScrollUp()
+				case "m", "M":
+					l.ScrollMiddle()
 				case "<C-d>", "L":
 					l.ScrollHalfPageDown()
 				case "<C-u>", "H":
